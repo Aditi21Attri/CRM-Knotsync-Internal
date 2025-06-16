@@ -14,13 +14,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
-import type { User } from "@/lib/types";
+import type { User, UserRole } from "@/lib/types";
 
 const employeeFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
+  role: z.enum(['admin', 'employee'], { required_error: "Role is required." }),
 });
 
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -31,21 +33,20 @@ interface EmployeeFormProps {
 }
 
 export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
-  const { addEmployee } = useData(); // Assuming updateEmployee will be added for editing
+  const { addEmployee, updateEmployee } = useData();
 
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: {
       name: employee?.name || "",
       email: employee?.email || "",
+      role: employee?.role || "employee",
     },
   });
 
   function onSubmit(data: EmployeeFormValues) {
     if (employee) {
-      // Handle update logic here if implemented
-      // updateEmployee({ ...employee, ...data });
-      console.log("Update employee:", { ...employee, ...data });
+      updateEmployee(employee.id, data);
     } else {
       addEmployee(data);
     }
@@ -59,7 +60,7 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
         <DialogHeader>
           <DialogTitle className="font-headline">{employee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
           <DialogDescription>
-            {employee ? "Update the details of the employee." : "Enter the details for the new employee."}
+            {employee ? "Update the details and role of the employee." : "Enter the details and assign a role for the new employee."}
           </DialogDescription>
         </DialogHeader>
         
@@ -86,6 +87,27 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
                 <FormControl>
                   <Input type="email" placeholder="e.g. jane.doe@example.com" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Role</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

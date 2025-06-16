@@ -2,9 +2,15 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { Customer, User, MappedCustomerData, CustomerStatus } from '@/lib/types';
+import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole } from '@/lib/types';
 import { mockCustomers, mockUsers } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
+
+interface EmployeeCreationData {
+  name: string;
+  email: string;
+  role: UserRole;
+}
 
 interface DataContextType {
   customers: Customer[];
@@ -14,7 +20,8 @@ interface DataContextType {
   updateCustomer: (updatedCustomer: Customer) => void;
   assignCustomer: (customerId: string, employeeId: string | null) => void;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => void;
-  addEmployee: (employeeData: Omit<User, 'id' | 'role' | 'avatarUrl'>) => void;
+  addEmployee: (employeeData: EmployeeCreationData) => void;
+  updateEmployee: (employeeId: string, updatedData: Partial<EmployeeCreationData>) => void;
   dataLoading: boolean;
 }
 
@@ -82,15 +89,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addEmployee = (employeeData: Omit<User, 'id' | 'role' | 'avatarUrl'>) => {
+  const addEmployee = (employeeData: EmployeeCreationData) => {
     const newEmployee: User = {
       ...employeeData,
       id: `emp${Date.now()}${Math.random().toString(36).substring(2, 5)}`,
-      role: 'employee',
-      avatarUrl: 'https://placehold.co/100x100',
+      avatarUrl: `https://placehold.co/100x100/E5EAF7/2962FF?text=${employeeData.name.substring(0,2).toUpperCase()}`, // Using initials for placeholder
     };
     setUsers(prev => [newEmployee, ...prev]);
-    toast({ title: "Employee Added", description: `${newEmployee.name} has been added as an employee.` });
+    toast({ title: "Employee Added", description: `${newEmployee.name} has been added as an ${newEmployee.role}.` });
+  };
+
+  const updateEmployee = (employeeId: string, updatedData: Partial<EmployeeCreationData>) => {
+    setUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === employeeId 
+          ? { ...user, ...updatedData, avatarUrl: user.avatarUrl || `https://placehold.co/100x100/E5EAF7/2962FF?text=${(updatedData.name || user.name).substring(0,2).toUpperCase()}` } // Retain or update avatar
+          : user
+      )
+    );
+    const employee = users.find(u => u.id === employeeId);
+    if (employee) {
+      toast({ title: "Employee Updated", description: `${updatedData.name || employee.name}'s details have been updated.`});
+    }
   };
 
 
@@ -104,6 +124,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       assignCustomer, 
       updateCustomerStatus, 
       addEmployee,
+      updateEmployee,
       dataLoading
     }}>
       {children}
