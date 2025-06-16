@@ -10,15 +10,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { MappedCustomerData, ExcelRowData, User } from "@/lib/types";
-import { UploadCloud, AlertTriangle, CheckCircle, Loader2, ListChecks, UserCheck as UserIcon } from "lucide-react";
-import Papa from 'papaparse'; // Using papaparse for CSV handling
+import { UploadCloud, AlertTriangle, CheckCircle, Loader2, ListChecks } from "lucide-react";
+import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
 
-// Define expected customer fields for mapping
 const customerFields: (keyof MappedCustomerData)[] = ["name", "email", "phoneNumber", "category"];
 
 export function ExcelImportForm() {
-  const { addCustomer, employees } = useData(); // Added employees from useData
+  const { addCustomer, employees } = useData();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ExcelRowData[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -26,8 +25,8 @@ export function ExcelImportForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Upload, 2: Map, 3: Review/Import
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null); // For assigning customers
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -44,7 +43,7 @@ export function ExcelImportForm() {
       setHeaders([]);
       setColumnMapping({} as Record<keyof MappedCustomerData, string>);
       setSuccessMessage(null);
-      setSelectedEmployeeId(null); // Reset selected employee
+      setSelectedEmployeeId(null);
     }
   };
 
@@ -71,7 +70,6 @@ export function ExcelImportForm() {
         }
         setParsedData(results.data);
         setHeaders(results.meta.fields);
-        // Auto-map if headers match customerFields (case-insensitive)
         const initialMapping = {} as Record<keyof MappedCustomerData, string>;
         customerFields.forEach(field => {
             const matchedHeader = results.meta.fields?.find(h => h.toLowerCase() === field.toLowerCase());
@@ -126,7 +124,6 @@ export function ExcelImportForm() {
                   customerData[header.replace(/\s+/g, '_').toLowerCase()] = String(row[header]);
               }
           });
-          // Pass selectedEmployeeId to addCustomer
           addCustomer(customerData, selectedEmployeeId, 'neutral'); 
           importedCount++;
       }
@@ -233,78 +230,73 @@ export function ExcelImportForm() {
       )}
       
       {step === 3 && (
-          <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Review Import</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                    You are about to import <strong>{parsedData.length}</strong> records. 
-                    The first record will be imported as follows (other records will follow the same mapping):
-                </p>
-                <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
-                  {parsedData.length > 0 && customerFields.map(field => {
-                      const mappedHeader = columnMapping[field];
-                      const value = mappedHeader ? String(parsedData[0][mappedHeader]) : "Not Mapped";
-                      return (
-                          <div key={field} className="flex justify-between text-sm">
-                              <span className="font-medium capitalize text-muted-foreground">{field.replace(/([A-Z])/g, ' $1')}:</span>
-                              <span className="font-mono text-foreground truncate max-w-[60%]">{value}</span>
-                          </div>
-                      );
-                  })}
+          <>
+            <CardContent className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Review Import</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                      You are about to import <strong>{parsedData.length}</strong> records. 
+                      The first record will be imported as follows (other records will follow the same mapping):
+                  </p>
+                  <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
+                    {parsedData.length > 0 && customerFields.map(field => {
+                        const mappedHeader = columnMapping[field];
+                        const value = mappedHeader ? String(parsedData[0][mappedHeader]) : "Not Mapped";
+                        return (
+                            <div key={field} className="flex justify-between text-sm">
+                                <span className="font-medium capitalize text-muted-foreground">{field.replace(/([A-Z])/g, ' $1')}:</span>
+                                <span className="font-mono text-foreground truncate max-w-[60%]">{value}</span>
+                            </div>
+                        );
+                    })}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="assign-employee" className="text-base font-medium">Assign to Employee (Optional)</Label>
-                <Select onValueChange={setSelectedEmployeeId} value={selectedEmployeeId || ""}>
-                    <SelectTrigger id="assign-employee" className="w-full md:w-1/2 mt-2 text-base">
-                        <SelectValue placeholder="Select employee to assign..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="" className="text-base">Do not assign (Unassigned)</SelectItem>
-                        {employees.map((employee: User) => (
-                            <SelectItem key={employee.id} value={employee.id} className="text-base">
-                                {employee.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                    All imported customers will be assigned to the selected employee. If none selected, they will be unassigned.
-                </p>
-              </div>
+                <div>
+                  <Label htmlFor="assign-employee" className="text-base font-medium">Assign to Employee (Optional)</Label>
+                  <Select onValueChange={setSelectedEmployeeId} value={selectedEmployeeId || ""}>
+                      <SelectTrigger id="assign-employee" className="w-full md:w-1/2 mt-2 text-base">
+                          <SelectValue placeholder="Select employee to assign..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="" className="text-base">Do not assign (Unassigned)</SelectItem>
+                          {employees.map((employee: User) => (
+                              <SelectItem key={employee.id} value={employee.id} className="text-base">
+                                  {employee.name}
+                              </SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                      All imported customers will be assigned to the selected employee. If none selected, they will be unassigned.
+                  </p>
+                </div>
 
-              {error && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              {successMessage && (
-                <Alert variant="default" className="mt-4 bg-green-500/10 border-green-500/50">
-                  <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-400" />
-                  <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
-                  <AlertDescription className="text-green-600 dark:text-green-300">{successMessage}</AlertDescription>
-                </Alert>
-              )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => {setStep(2); setError(null); setSuccessMessage(null);}} disabled={isLoading}>Back to Mapping</Button>
-            <Button onClick={handleImportData} disabled={isLoading || !!successMessage} className="text-lg py-3">
-                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
-                Confirm & Import Data
-            </Button>
-          </CardFooter>
+                {error && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {successMessage && (
+                  <Alert variant="default" className="mt-4 bg-green-500/10 border-green-500/50">
+                    <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-400" />
+                    <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
+                    <AlertDescription className="text-green-600 dark:text-green-300">{successMessage}</AlertDescription>
+                  </Alert>
+                )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => {setStep(2); setError(null); setSuccessMessage(null);}} disabled={isLoading}>Back to Mapping</Button>
+              <Button onClick={handleImportData} disabled={isLoading || !!successMessage} className="text-lg py-3">
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+                  Confirm & Import Data
+              </Button>
+            </CardFooter>
+          </>
       )}
 
     </Card>
   );
 }
-
-// Add PapaParse to your project: npm install papaparse
-// And its types: npm install @types/papaparse --save-dev
-// This is a client component, ensure it's used where client-side interactions are appropriate.
-
-
-    
