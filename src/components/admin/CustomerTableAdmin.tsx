@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useData } from "@/contexts/DataContext";
 import type { Customer, User, CustomerStatus } from "@/lib/types";
 import { getEmployeeNameById } from "@/lib/mockData"; // Using mockData helper for now
-import { ArrowUpDown, Search, Filter, UserCircle, Edit3 } from "lucide-react";
+import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -44,6 +44,7 @@ export function CustomerTableAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all">("all");
   const [assignedFilter, setAssignedFilter] = useState<string | "all" | "unassigned">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string | "all">("all");
   const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -52,6 +53,11 @@ export function CustomerTableAdmin() {
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
     return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
   }
+
+  const uniqueCategories = useMemo(() => {
+    const categories = new Set(customers.map(c => c.category).filter(Boolean) as string[]);
+    return ["all", ...Array.from(categories).sort()];
+  }, [customers]);
 
   const filteredCustomers = useMemo(() => {
     let filtered = customers;
@@ -70,17 +76,30 @@ export function CustomerTableAdmin() {
     } else if (assignedFilter !== "all") {
         filtered = filtered.filter(c => c.assignedTo === assignedFilter);
     }
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(c => c.category === categoryFilter);
+    }
     return filtered;
-  }, [customers, searchTerm, statusFilter, assignedFilter]);
+  }, [customers, searchTerm, statusFilter, assignedFilter, categoryFilter]);
 
   const sortedCustomers = useMemo(() => {
     let sortableItems = [...filteredCustomers];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
-        if (a[sortConfig.key!] < b[sortConfig.key!]) {
+        const valA = a[sortConfig.key!];
+        const valB = b[sortConfig.key!];
+
+        if (valA === null || valA === undefined) return 1; // Treat nulls/undefined as "greater"
+        if (valB === null || valB === undefined) return -1;
+        
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+
+        if (valA < valB) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (a[sortConfig.key!] > b[sortConfig.key!]) {
+        if (valA > valB) {
           return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;
@@ -133,10 +152,10 @@ export function CustomerTableAdmin() {
             className="pl-10 w-full"
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex-grow md:flex-grow-0">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <Filter className="mr-2 h-4 w-4" /> Status: <span className="capitalize ml-1">{statusFilter}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -158,7 +177,7 @@ export function CustomerTableAdmin() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex-grow md:flex-grow-0">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <UserCircle className="mr-2 h-4 w-4" /> Assigned: <span className="capitalize ml-1">{assignedFilter === "all" ? "All" : assignedFilter === "unassigned" ? "Unassigned" : getEmployeeNameById(assignedFilter)}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -184,6 +203,28 @@ export function CustomerTableAdmin() {
                   onCheckedChange={() => { setAssignedFilter(emp.id); setCurrentPage(1); }}
                 >
                   {emp.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Tag className="mr-2 h-4 w-4" /> Category: <span className="capitalize ml-1">{categoryFilter}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {uniqueCategories.map(cat => (
+                <DropdownMenuCheckboxItem
+                  key={cat}
+                  checked={categoryFilter === cat}
+                  onCheckedChange={() => { setCategoryFilter(cat); setCurrentPage(1); }}
+                  className="capitalize"
+                >
+                  {cat === "all" ? "All" : cat}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -309,3 +350,4 @@ export function CustomerTableAdmin() {
     </div>
   );
 }
+
