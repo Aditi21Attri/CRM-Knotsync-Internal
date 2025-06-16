@@ -32,8 +32,10 @@ export function ExcelImportForm() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const selectedFile = event.target.files[0];
-      if (selectedFile.type !== 'text/csv') {
-          setError("Invalid file type. Please upload a CSV file.");
+      const fileName = selectedFile.name.toLowerCase();
+
+      if (!fileName.endsWith('.csv')) {
+          setError("Invalid file type. Please upload a CSV file (must have a .csv extension).");
           setFile(null);
           return;
       }
