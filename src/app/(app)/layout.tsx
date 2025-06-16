@@ -6,19 +6,29 @@ import { SidebarProvider, Sidebar, SidebarInset, SidebarRail } from "@/component
 import { Header } from "@/components/layout/Header";
 import { SidebarContents } from "@/components/layout/SidebarContents";
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { currentUser, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoading && !currentUser) {
-      router.replace('/login');
+    if (!isLoading) {
+      if (!currentUser) {
+        router.replace('/login');
+      } else {
+        // Role-based route protection
+        if (pathname.startsWith('/admin') && currentUser.role !== 'admin') {
+          router.replace('/dashboard'); // Or an access-denied page
+        } else if (pathname.startsWith('/employee') && currentUser.role !== 'employee') {
+          router.replace('/dashboard'); // Or an access-denied page
+        }
+      }
     }
-  }, [currentUser, isLoading, router]);
+  }, [currentUser, isLoading, router, pathname]);
 
   if (isLoading || !currentUser) {
     return (
@@ -52,3 +62,4 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
