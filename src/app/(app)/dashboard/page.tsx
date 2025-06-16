@@ -6,7 +6,7 @@ import { useData } from "@/contexts/DataContext";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Briefcase, UserCheck, PieChart, TrendingUp, TrendingDown } from "lucide-react";
+import { Users, Briefcase, UserCheck, PieChart, TrendingUp, TrendingDown, FileInput } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -88,7 +88,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="aspect-video relative rounded-md overflow-hidden">
                     <Image 
-                        src="https://placehold.co/600x338/e5eaf7/2962ff" // Placeholder for a relevant image
+                        src="https://placehold.co/600x338/e5eaf7/2962ff" 
                         alt="CRM Dashboard Illustration" 
                         layout="fill"
                         objectFit="cover"
