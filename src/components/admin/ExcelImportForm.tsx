@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 const customerFields: (keyof MappedCustomerData)[] = ["name", "email", "phoneNumber", "category"];
 
 export function ExcelImportForm() {
-  const { addCustomer, employees } = useData(); // employees will have specializedRegion
+  const { addCustomer, employees } = useData();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ExcelRowData[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -26,7 +26,8 @@ export function ExcelImportForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [defaultSelectedEmployeeId, setDefaultSelectedEmployeeId] = useState<string | "unassigned">("unassigned"); // Renamed for clarity
+  const [defaultSelectedEmployeeId, setDefaultSelectedEmployeeId] = useState<string | "unassigned">("unassigned");
+  const [firstRecordPreview, setFirstRecordPreview] = useState<Record<string, string> | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +47,7 @@ export function ExcelImportForm() {
       setColumnMapping({} as Record<keyof MappedCustomerData, string>);
       setSuccessMessage(null);
       setDefaultSelectedEmployeeId("unassigned");
+      setFirstRecordPreview(null);
     }
   };
 
@@ -66,12 +68,6 @@ export function ExcelImportForm() {
 
           if (firstError) {
             userErrorMessage = `Error parsing CSV (around line ${errorRowDisplay}): ${firstError.message}. Please check the file format.`;
-            console.error(
-              `CSV Parsing failed with ${results.errors.length} error(s). First error (around line ${errorRowDisplay}, code: ${firstError.code}): ${firstError.message}`,
-              firstError
-            );
-          } else {
-             console.error("CSV Parsing errors encountered:", results.errors);
           }
           setError(userErrorMessage);
           setIsLoading(false);
@@ -83,7 +79,7 @@ export function ExcelImportForm() {
              return;
         }
         setParsedData(results.data);
-        setHeaders(results.meta.fields.filter(h => h !== "") || []); // Filter out empty headers
+        setHeaders(results.meta.fields.filter(h => h !== "") || []);
         const initialMapping = {} as Record<keyof MappedCustomerData, string>;
         customerFields.forEach(field => {
             const matchedHeader = results.meta.fields?.find(h => h.toLowerCase() === field.toLowerCase());
@@ -94,6 +90,7 @@ export function ExcelImportForm() {
         setColumnMapping(initialMapping);
         setStep(2);
         setIsLoading(false);
+        setError(null);
       },
       error: (err: any) => {
           setError(`Error parsing file: ${err.message}`);
@@ -106,15 +103,68 @@ export function ExcelImportForm() {
     setColumnMapping(prev => ({ ...prev, [customerField]: csvHeader }));
   };
 
+  const handleProceedToReview = () => {
+    const requiredCoreFieldsMapped = ["name", "email"].every(field => !!columnMapping[field as keyof MappedCustomerData]);
+    if (!requiredCoreFieldsMapped) {
+        setError("Please map at least 'Name' and 'Email' customer fields before proceeding.");
+        return;
+    }
+
+    if (parsedData.length > 0) {
+        const firstRow = parsedData[0];
+        const displayPreview: Record<string, string> = {};
+
+        // Process mapped structured fields (name, email, phoneNumber, category)
+        customerFields.forEach(fieldKey => {
+            const csvHeader = columnMapping[fieldKey];
+            if (csvHeader && firstRow[csvHeader] !== undefined && firstRow[csvHeader] !== null) {
+                displayPreview[fieldKey] = String(firstRow[csvHeader]);
+            } else if (csvHeader) { // Mapped but no value in first row
+                displayPreview[fieldKey] = "N/A in first row";
+            } else { // Not mapped
+                displayPreview[fieldKey] = "Not Mapped";
+            }
+        });
+
+        // Process other unmapped CSV columns as additional data
+        headers.forEach(header => {
+            if (!Object.values(columnMapping).includes(header)) { // If header wasn't used for a structured field
+                if (firstRow[header] !== undefined && firstRow[header] !== null) {
+                    const additionalFieldKey = header.replace(/\s+/g, '_').toLowerCase();
+                    // Avoid overwriting already processed structured fields if a CSV header coincidentally matches a structured field name after normalization
+                    if (!customerFields.includes(additionalFieldKey as keyof MappedCustomerData)) {
+                         displayPreview[additionalFieldKey] = String(firstRow[header]);
+                    } else if (!displayPreview[additionalFieldKey]) { // Only if the structured field wasn't already set (e.g. from direct mapping)
+                         displayPreview[additionalFieldKey] = String(firstRow[header]);
+                    }
+                }
+            }
+        });
+        setFirstRecordPreview(displayPreview);
+    } else {
+        setFirstRecordPreview(null);
+    }
+    setStep(3);
+    setError(null);
+  };
+
+  const formatPreviewKey = (key: string) => {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1') // Add space before capital letters for camelCase/PascalCase
+      .trim()
+      .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+  };
+
   const handleImportData = async (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
 
-    const requiredFieldsMapped = customerFields.every(field => !!columnMapping[field]);
-    if(!requiredFieldsMapped) {
-        setError("Please map all required customer fields (Name, Email, Phone Number, Category).");
+    const requiredCoreFieldsMapped = ["name", "email"].every(field => !!columnMapping[field as keyof MappedCustomerData]);
+    if(!requiredCoreFieldsMapped) {
+        setError("Please map at least Name and Email customer fields.");
         setIsLoading(false);
         return;
     }
@@ -125,24 +175,36 @@ export function ExcelImportForm() {
     for (const row of parsedData) {
       const customerData: MappedCustomerData = {} as MappedCustomerData;
       let validRow = true;
+
+      // Populate structured fields based on mapping
       customerFields.forEach(field => {
         const csvHeader = columnMapping[field];
         if (csvHeader && row[csvHeader] !== undefined && row[csvHeader] !== null) {
           customerData[field] = String(row[csvHeader]);
         } else if (field === "name" || field === "email") { 
-            validRow = false; 
+            // If core fields (name, email) are mapped but missing in this row, mark as invalid
+            if(csvHeader) validRow = false; 
         }
       });
+      // If core required fields (name, email) were not even mapped, this row is invalid for import
+      if(!customerData.name || !customerData.email) {
+          validRow = false;
+      }
+
 
       if(validRow) {
+          // Add all other CSV columns as additional properties
           headers.forEach(header => {
-              if (!Object.values(columnMapping).includes(header) && row[header] !== undefined && row[header] !== null) {
-                  customerData[header.replace(/\s+/g, '_').toLowerCase()] = String(row[header]);
+              if (!Object.values(columnMapping).includes(header)) { // If header wasn't used for a structured field
+                  if (row[header] !== undefined && row[header] !== null) {
+                    const key = header.replace(/\s+/g, '_').toLowerCase();
+                    (customerData as any)[key] = String(row[header]);
+                  }
               }
           });
 
           let finalAssignedTo: string | null = defaultSelectedEmployeeId === "unassigned" ? null : defaultSelectedEmployeeId;
-          const customerRegion = customerData.category; // Assuming 'category' field holds the region after mapping
+          const customerRegion = customerData.category; 
 
           if (customerRegion) {
             const regionalEmployee = employees.find(emp => 
@@ -173,9 +235,10 @@ export function ExcelImportForm() {
         assignmentMessage += `${importedCount - autoAssignedCount} customer(s) assigned to ${defaultAssignee.name}.`;
       } else if (defaultSelectedEmployeeId === "unassigned" && (importedCount - autoAssignedCount > 0)) {
         assignmentMessage += `${importedCount - autoAssignedCount} customer(s) remain unassigned.`;
-      } else if (importedCount - autoAssignedCount === 0 && autoAssignedCount === 0) {
-        assignmentMessage = "All imported customers remain unassigned."
+      } else if (importedCount - autoAssignedCount === 0 && autoAssignedCount === 0 && importedCount > 0) {
+         assignmentMessage = importedCount > 1 ? "All imported customers remain unassigned." : "The imported customer remains unassigned.";
       }
+
 
       const successMsg = `${importedCount} customer(s) imported successfully. ${assignmentMessage.trim()}`;
       setSuccessMessage(successMsg);
@@ -185,10 +248,11 @@ export function ExcelImportForm() {
       setHeaders([]);
       setColumnMapping({} as Record<keyof MappedCustomerData, string>);
       setDefaultSelectedEmployeeId("unassigned");
+      setFirstRecordPreview(null);
       setStep(1);
     } else {
-      setError("No customers were imported. Check your data and mappings.");
-      toast({ title: "Import Failed", description: "No customers were imported. Check data and mappings.", variant: "destructive" });
+      setError("No customers were imported. Check your data, mappings (ensure Name and Email are mapped and present), and file format.");
+      toast({ title: "Import Failed", description: "No customers were imported. Check data, mappings, and file format.", variant: "destructive" });
     }
     setIsLoading(false);
   };
@@ -201,7 +265,7 @@ export function ExcelImportForm() {
         </CardTitle>
         <CardDescription>
           Upload CSV, map columns to customer fields (use 'Category' for country/region for auto-assignment), 
-          and import data. Customers may be auto-assigned if their region matches an employee's specialized region.
+          and import data. All columns from your CSV will be imported. Customers may be auto-assigned if their region matches an employee's specialized region.
         </CardDescription>
       </CardHeader>
 
@@ -227,17 +291,17 @@ export function ExcelImportForm() {
       )}
 
       {step === 2 && headers.length > 0 && (
-        <form onSubmit={(e) => { e.preventDefault(); setStep(3); }}>
+        <form onSubmit={(e) => { e.preventDefault(); handleProceedToReview(); }}>
           <CardContent className="space-y-6">
             <h3 className="text-xl font-semibold text-foreground">Map CSV Columns to Customer Fields</h3>
             <p className="text-sm text-muted-foreground">
-                Select the CSV column for each customer field. Map your 'Country' or 'Region' CSV column to the 'Category' field for regional auto-assignment.
-                Preview of the first data row is shown below each mapping.
+                Select the CSV column for each standard customer field. Map your 'Country' or 'Region' CSV column to the 'Category' field for regional auto-assignment.
+                All other columns in your CSV will be imported automatically. Preview of the first data row is shown below each mapping.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {customerFields.map(field => (
                     <div key={field} className="space-y-2 p-4 border rounded-md bg-background/50">
-                    <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}{field === 'category' ? ' (for Region)' : ''}</Label>
+                    <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{formatPreviewKey(field)}{field === 'category' ? ' (for Region)' : ''}{field === 'name' || field === 'email' ? ' (Required)' : ''}</Label>
                     <Select
                         onValueChange={(value) => handleMappingChange(field, value)}
                         defaultValue={columnMapping[field]}
@@ -269,7 +333,7 @@ export function ExcelImportForm() {
           )}
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => {setStep(1); setError(null);}} disabled={isLoading}>Back to Upload</Button>
+            <Button variant="outline" onClick={() => {setStep(1); setError(null); setFirstRecordPreview(null);}} disabled={isLoading}>Back to Upload</Button>
             <Button type="submit" disabled={isLoading} className="text-lg py-3">
               {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
               Review & Import
@@ -286,20 +350,20 @@ export function ExcelImportForm() {
                   <p className="text-sm text-muted-foreground mb-4">
                       You are about to import <strong>{parsedData.length}</strong> records. 
                       Customers may be auto-assigned to employees based on matching specialized regions (using the 'Category' field).
-                      A preview of the first record's mapping:
+                      A preview of the first record's data as it will be imported (all CSV columns shown):
                   </p>
-                  <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
-                    {parsedData.length > 0 && customerFields.map(field => {
-                        const mappedHeader = columnMapping[field];
-                        const value = mappedHeader ? String(parsedData[0][mappedHeader]) : "Not Mapped";
-                        return (
-                            <div key={field} className="flex justify-between text-sm">
-                                <span className="font-medium capitalize text-muted-foreground">{field.replace(/([A-Z])/g, ' $1')}{field === 'category' ? ' (as Region)' : ''}:</span>
-                                <span className="font-mono text-foreground truncate max-w-[60%]">{value}</span>
-                            </div>
-                        );
-                    })}
-                  </div>
+                   {firstRecordPreview ? (
+                    <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
+                      {Object.entries(firstRecordPreview).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span className="font-medium text-muted-foreground">{formatPreviewKey(key)}:</span>
+                          <span className="font-mono text-foreground truncate max-w-[60%]">{String(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No data to preview. Please ensure 'Name' and 'Email' fields are mapped in the previous step.</p>
+                  )}
                 </div>
 
                 <div>
@@ -341,8 +405,8 @@ export function ExcelImportForm() {
                 )}
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => {setStep(2); setError(null); setSuccessMessage(null);}} disabled={isLoading}>Back to Mapping</Button>
-              <Button onClick={handleImportData} disabled={isLoading || !!successMessage} className="text-lg py-3">
+              <Button variant="outline" onClick={() => {setStep(2); setError(null); setSuccessMessage(null); /* Keep firstRecordPreview for quick re-review if desired */}} disabled={isLoading}>Back to Mapping</Button>
+              <Button onClick={handleImportData} disabled={isLoading || !!successMessage || !firstRecordPreview} className="text-lg py-3">
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
                   Confirm & Import Data
               </Button>
@@ -353,3 +417,4 @@ export function ExcelImportForm() {
     </Card>
   );
 }
+
