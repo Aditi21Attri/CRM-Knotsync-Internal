@@ -12,10 +12,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { DialogFooter, DialogHeader, DialogTitle, DialogDescription as FormDialogDescription, DialogClose } from "@/components/ui/dialog"; // Renamed DialogDescription to avoid conflict
 import { useData } from "@/contexts/DataContext";
 import type { User, UserRole } from "@/lib/types";
 
@@ -23,6 +24,7 @@ const employeeFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   role: z.enum(['admin', 'employee'], { required_error: "Role is required." }),
+  specializedRegion: z.string().optional().describe("The region the employee specializes in, e.g., USA, UK."),
 });
 
 // Schema for adding an employee (password is required)
@@ -51,19 +53,17 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
       name: employee?.name || "",
       email: employee?.email || "",
       role: employee?.role || "employee",
-      // Conditionally add password only if it exists in the schema (i.e., for adding)
+      specializedRegion: employee?.specializedRegion || "",
       ...(currentFormSchema === addEmployeeFormSchema && { password: "" }),
     },
   });
 
   function onSubmit(data: EmployeeFormValues) {
     if (employee) {
-      // For editing, we don't handle password changes in this form
-      const { ...editData } = data as z.infer<typeof editEmployeeFormSchema>; // Cast to edit schema
+      const { ...editData } = data as z.infer<typeof editEmployeeFormSchema>;
       updateEmployee(employee.id, editData);
     } else {
-      // For adding, password is included
-      addEmployee(data as z.infer<typeof addEmployeeFormSchema>); // Cast to add schema
+      addEmployee(data as z.infer<typeof addEmployeeFormSchema>);
     }
     form.reset();
     onFormSubmit?.();
@@ -74,12 +74,12 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <DialogHeader>
           <DialogTitle className="font-headline">{employee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
-          <DialogDescription>
-            {employee ? "Update the details and role of the employee." : "Enter the details, assign a role, and set a password for the new employee."}
-          </DialogDescription>
+          <FormDialogDescription>
+            {employee ? "Update the details, role, and specialized region of the employee." : "Enter details, assign role, set password, and optionally a specialized region."}
+          </FormDialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 px-6 py-2">
+        <div className="space-y-4 px-6 py-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
           <FormField
             control={form.control}
             name="name"
@@ -106,7 +106,7 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
               </FormItem>
             )}
           />
-          {!employee && ( // Only show password field when adding a new employee
+          {!employee && ( 
             <FormField
               control={form.control}
               name="password"
@@ -142,9 +142,25 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="specializedRegion"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Specialized Region (Optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., USA, UK, Australia" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <FormDescription>
+                  If this employee handles customers from a specific region/country, enter it here.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
         
-        <DialogFooter className="px-6 pb-6">
+        <DialogFooter className="px-6 pb-6 pt-4 border-t">
           <DialogClose asChild>
              <Button variant="outline" type="button">Cancel</Button>
           </DialogClose>

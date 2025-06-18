@@ -5,14 +5,12 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction } from '@/lib/actions/customerActions';
-import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction } from '@/lib/actions/userActions';
+import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData } from '@/lib/actions/userActions'; // Import EmployeeData
 
-interface EmployeeCreationData {
-  name: string;
-  email: string;
-  role: UserRole;
-  password?: string; // Password is now part of creation data
-}
+// Use EmployeeData for creation, ensuring password is required for new employees
+interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
+interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password'>> {}
+
 
 interface DataContextType {
   customers: Customer[];
@@ -23,7 +21,7 @@ interface DataContextType {
   assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
   addEmployee: (employeeData: EmployeeCreationData) => Promise<void>;
-  updateEmployee: (employeeId: string, updatedData: Partial<Omit<EmployeeCreationData, 'password'>>) => Promise<void>; // Password update not handled here
+  updateEmployee: (employeeId: string, updatedData: EmployeeUpdateData) => Promise<void>;
   dataLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -68,7 +66,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const newCustomer = await addCustomerAction(customerData, assignedTo, status);
       setCustomers(prev => [newCustomer, ...prev]);
-      toast({ title: "Customer Added", description: `${newCustomer.name} has been added successfully.` });
+      // Toast is handled in ExcelImportForm for more specific messaging
     } catch (error) {
       console.error("Failed to add customer:", error);
       toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" });
@@ -122,12 +120,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addEmployee = async (employeeData: EmployeeCreationData) => {
-    if (!employeeData.password) { // Should be guaranteed by form, but good to check
-        toast({ title: "Error", description: "Password is required for new employees.", variant: "destructive" });
-        return;
-    }
     try {
-      const newEmployee = await addEmployeeAction(employeeData as Required<EmployeeCreationData>); // Ensure password is sent
+      // Ensure password is provided, which EmployeeCreationData type now enforces
+      const newEmployee = await addEmployeeAction(employeeData); 
       setUsers(prev => [newEmployee, ...prev]);
       if (newEmployee.role === 'employee') {
         setEmployees(prev => [newEmployee, ...prev]);
@@ -135,25 +130,25 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Employee Added", description: `${newEmployee.name} has been added as an ${newEmployee.role}.` });
     } catch (error) {
       console.error("Failed to add employee:", error);
-      toast({ title: "Error", description: "Failed to add employee.", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to add employee: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
     }
   };
 
-  const updateEmployee = async (employeeId: string, updatedData: Partial<Omit<EmployeeCreationData, 'password'>>) => {
+  const updateEmployee = async (employeeId: string, updatedData: EmployeeUpdateData) => {
     try {
       const updatedEmployee = await updateEmployeeAction(employeeId, updatedData);
       if (updatedEmployee) {
         setUsers(prevUsers => prevUsers.map(user => user.id === updatedEmployee.id ? updatedEmployee : user));
         
-        // Update employees array based on role
         const isCurrentlyEmployee = employees.some(emp => emp.id === updatedEmployee.id);
         if (updatedEmployee.role === 'employee') {
           if (isCurrentlyEmployee) {
             setEmployees(prevEmps => prevEmps.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
           } else {
-            setEmployees(prevEmps => [...prevEmps, updatedEmployee]);
+            // If role changed to employee
+            setEmployees(prevEmps => [...prevEmps.filter(emp => emp.id !== updatedEmployee.id), updatedEmployee]);
           }
-        } else { // Role is admin or something else
+        } else { 
           setEmployees(prevEmps => prevEmps.filter(emp => emp.id !== updatedEmployee.id));
         }
         toast({ title: "Employee Updated", description: `${updatedEmployee.name}'s details have been updated.`});
@@ -162,7 +157,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Failed to update employee:", error);
-      toast({ title: "Error", description: "Failed to update employee.", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to update employee: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
     }
   };
 

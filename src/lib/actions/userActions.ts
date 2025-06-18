@@ -5,14 +5,13 @@ import { connectToDatabase } from '@/lib/mongodb';
 import type { User, UserRole } from '@/lib/types';
 import { ObjectId } from 'mongodb';
 
-// This interface is used when creating/updating employees.
-// Password is required for creation.
 export interface EmployeeData {
   name: string;
   email: string;
   role: UserRole;
   avatarUrl?: string;
   password?: string; 
+  specializedRegion?: string;
 }
 
 export async function getUsers(): Promise<User[]> {
@@ -27,9 +26,10 @@ export async function getUsers(): Promise<User[]> {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        password: restOfDoc.password, // Include password field
+        password: restOfDoc.password,
         role: restOfDoc.role,
         avatarUrl: restOfDoc.avatarUrl,
+        specializedRegion: restOfDoc.specializedRegion,
       };
       return user;
     });
@@ -43,6 +43,7 @@ export async function getEmployees(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    // Fetch all users and then filter for employees client-side or ensure role is strictly 'employee' in DB query if preferred
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
@@ -51,9 +52,10 @@ export async function getEmployees(): Promise<User[]> {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        password: restOfDoc.password, // Include password field
+        password: restOfDoc.password,
         role: restOfDoc.role,
         avatarUrl: restOfDoc.avatarUrl,
+        specializedRegion: restOfDoc.specializedRegion,
       };
       return employee;
     });
@@ -64,12 +66,11 @@ export async function getEmployees(): Promise<User[]> {
 }
 
 
-export async function addEmployeeAction(employeeData: Required<EmployeeData>): Promise<User> {
+export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>> & Partial<EmployeeData>): Promise<User> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
 
-    // Check if email already exists
     const existingUser = await usersCollection.findOne({ email: employeeData.email });
     if (existingUser) {
       throw new Error('An employee with this email already exists.');
@@ -78,9 +79,10 @@ export async function addEmployeeAction(employeeData: Required<EmployeeData>): P
     const newEmployeeDbData: Omit<User, 'id'> = {
       name: employeeData.name,
       email: employeeData.email,
-      password: employeeData.password, // Store the password
+      password: employeeData.password,
       role: employeeData.role,
       avatarUrl: employeeData.avatarUrl || `https://placehold.co/100x100/E5EAF7/2962FF?text=${employeeData.name.substring(0,2).toUpperCase()}`,
+      specializedRegion: employeeData.specializedRegion || undefined,
     };
 
     const result = await usersCollection.insertOne(newEmployeeDbData);
@@ -103,6 +105,7 @@ export async function addEmployeeAction(employeeData: Required<EmployeeData>): P
       password: restOfDoc.password,
       role: restOfDoc.role,
       avatarUrl: restOfDoc.avatarUrl,
+      specializedRegion: restOfDoc.specializedRegion,
     };
     return finalUser;
 
@@ -122,7 +125,6 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
     if (updatedData.name && !updatedData.avatarUrl) { 
         updatePayload.avatarUrl = `https://placehold.co/100x100/E5EAF7/2962FF?text=${updatedData.name.substring(0,2).toUpperCase()}`;
     }
-     // Do not update password here. Create a separate action for password changes if needed.
     
     const result = await usersCollection.findOneAndUpdate(
       { _id: new ObjectId(employeeId) },
@@ -139,9 +141,10 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
       id: _id.toString(),
       name: restOfUser.name,
       email: restOfUser.email,
-      password: restOfUser.password, // Keep existing password
+      password: restOfUser.password,
       role: restOfUser.role,
       avatarUrl: restOfUser.avatarUrl,
+      specializedRegion: restOfUser.specializedRegion,
     };
     return updatedUser;
 
@@ -160,26 +163,23 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
     const userDoc = await usersCollection.findOne({ email: email.toLowerCase() });
 
     if (!userDoc) {
-      return null; // User not found
+      return null; 
     }
 
-    // For this mock system, direct password comparison.
-    // In a real app, use bcrypt.compare(passwordAttempt, userDoc.passwordHash)
     if (userDoc.password === passwordAttempt) {
       const { _id, ...restOfDoc } = userDoc;
       const user: User = {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        // Do not send password back to client, even if it's plain text in DB for mock
-        // password: restOfDoc.password, 
         role: restOfDoc.role,
         avatarUrl: restOfDoc.avatarUrl,
+        specializedRegion: restOfDoc.specializedRegion,
       };
       return user;
     }
 
-    return null; // Password incorrect
+    return null; 
   } catch (error) {
     console.error('Error during user authentication:', error);
     throw new Error('Authentication failed due to a server error.');

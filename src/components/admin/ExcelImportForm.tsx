@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 const customerFields: (keyof MappedCustomerData)[] = ["name", "email", "phoneNumber", "category"];
 
 export function ExcelImportForm() {
-  const { addCustomer, employees } = useData();
+  const { addCustomer, employees } = useData(); // employees will have specializedRegion
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ExcelRowData[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -26,7 +26,7 @@ export function ExcelImportForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [defaultSelectedEmployeeId, setDefaultSelectedEmployeeId] = useState<string | "unassigned">("unassigned"); // Renamed for clarity
   const { toast } = useToast();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +45,7 @@ export function ExcelImportForm() {
       setHeaders([]);
       setColumnMapping({} as Record<keyof MappedCustomerData, string>);
       setSuccessMessage(null);
-      setSelectedEmployeeId(null);
+      setDefaultSelectedEmployeeId("unassigned");
     }
   };
 
@@ -83,7 +83,7 @@ export function ExcelImportForm() {
              return;
         }
         setParsedData(results.data);
-        setHeaders(results.meta.fields || []);
+        setHeaders(results.meta.fields.filter(h => h !== "") || []); // Filter out empty headers
         const initialMapping = {} as Record<keyof MappedCustomerData, string>;
         customerFields.forEach(field => {
             const matchedHeader = results.meta.fields?.find(h => h.toLowerCase() === field.toLowerCase());
@@ -106,7 +106,7 @@ export function ExcelImportForm() {
     setColumnMapping(prev => ({ ...prev, [customerField]: csvHeader }));
   };
 
-  const handleImportData = (event: FormEvent) => {
+  const handleImportData = async (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
@@ -120,7 +120,9 @@ export function ExcelImportForm() {
     }
     
     let importedCount = 0;
-    parsedData.forEach(row => {
+    let autoAssignedCount = 0;
+
+    for (const row of parsedData) {
       const customerData: MappedCustomerData = {} as MappedCustomerData;
       let validRow = true;
       customerFields.forEach(field => {
@@ -138,21 +140,51 @@ export function ExcelImportForm() {
                   customerData[header.replace(/\s+/g, '_').toLowerCase()] = String(row[header]);
               }
           });
-          addCustomer(customerData, selectedEmployeeId, 'neutral'); 
+
+          let finalAssignedTo: string | null = defaultSelectedEmployeeId === "unassigned" ? null : defaultSelectedEmployeeId;
+          const customerRegion = customerData.category; // Assuming 'category' field holds the region after mapping
+
+          if (customerRegion) {
+            const regionalEmployee = employees.find(emp => 
+              emp.role === 'employee' && 
+              emp.specializedRegion && 
+              emp.specializedRegion.trim().toLowerCase() === customerRegion.trim().toLowerCase()
+            );
+            if (regionalEmployee) {
+              finalAssignedTo = regionalEmployee.id;
+              if (finalAssignedTo !== (defaultSelectedEmployeeId === "unassigned" ? null : defaultSelectedEmployeeId)) {
+                autoAssignedCount++;
+              }
+            }
+          }
+          
+          await addCustomer(customerData, finalAssignedTo, 'neutral'); 
           importedCount++;
       }
-    });
+    }
 
     if (importedCount > 0) {
-      const assignedToEmployee = employees.find(emp => emp.id === selectedEmployeeId);
-      const assignmentMessage = assignedToEmployee ? ` and assigned to ${assignedToEmployee.name}` : '';
-      setSuccessMessage(`${importedCount} customers imported successfully${assignmentMessage}!`);
-      toast({ title: "Import Successful", description: `${importedCount} customers imported${assignmentMessage}.` });
+      const defaultAssignee = employees.find(emp => emp.id === defaultSelectedEmployeeId);
+      let assignmentMessage = "";
+      if (autoAssignedCount > 0) {
+        assignmentMessage = `${autoAssignedCount} customer(s) auto-assigned by region. `;
+      }
+      if (defaultAssignee && (importedCount - autoAssignedCount > 0)) {
+        assignmentMessage += `${importedCount - autoAssignedCount} customer(s) assigned to ${defaultAssignee.name}.`;
+      } else if (defaultSelectedEmployeeId === "unassigned" && (importedCount - autoAssignedCount > 0)) {
+        assignmentMessage += `${importedCount - autoAssignedCount} customer(s) remain unassigned.`;
+      } else if (importedCount - autoAssignedCount === 0 && autoAssignedCount === 0) {
+        assignmentMessage = "All imported customers remain unassigned."
+      }
+
+      const successMsg = `${importedCount} customer(s) imported successfully. ${assignmentMessage.trim()}`;
+      setSuccessMessage(successMsg);
+      toast({ title: "Import Successful", description: successMsg });
       setFile(null);
       setParsedData([]);
       setHeaders([]);
       setColumnMapping({} as Record<keyof MappedCustomerData, string>);
-      setSelectedEmployeeId(null);
+      setDefaultSelectedEmployeeId("unassigned");
       setStep(1);
     } else {
       setError("No customers were imported. Check your data and mappings.");
@@ -167,7 +199,10 @@ export function ExcelImportForm() {
         <CardTitle className="font-headline text-2xl flex items-center">
           <UploadCloud className="mr-3 h-7 w-7 text-primary" /> Import Customer Data (CSV)
         </CardTitle>
-        <CardDescription>Upload a CSV file, map columns, and import customer data into the CRM.</CardDescription>
+        <CardDescription>
+          Upload CSV, map columns to customer fields (use 'Category' for country/region for auto-assignment), 
+          and import data. Customers may be auto-assigned if their region matches an employee's specialized region.
+        </CardDescription>
       </CardHeader>
 
       {step === 1 && (
@@ -196,13 +231,13 @@ export function ExcelImportForm() {
           <CardContent className="space-y-6">
             <h3 className="text-xl font-semibold text-foreground">Map CSV Columns to Customer Fields</h3>
             <p className="text-sm text-muted-foreground">
-                Select the CSV column that corresponds to each customer field. 
-                A preview of the first data row is shown below each mapping.
+                Select the CSV column for each customer field. Map your 'Country' or 'Region' CSV column to the 'Category' field for regional auto-assignment.
+                Preview of the first data row is shown below each mapping.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {customerFields.map(field => (
                     <div key={field} className="space-y-2 p-4 border rounded-md bg-background/50">
-                    <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}</Label>
+                    <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}{field === 'category' ? ' (for Region)' : ''}</Label>
                     <Select
                         onValueChange={(value) => handleMappingChange(field, value)}
                         defaultValue={columnMapping[field]}
@@ -212,7 +247,7 @@ export function ExcelImportForm() {
                         <SelectValue placeholder="Select CSV Column" />
                         </SelectTrigger>
                         <SelectContent>
-                        {headers.filter(h => h !== "").map(header => (
+                        {headers.map(header => (
                             <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
                         ))}
                         </SelectContent>
@@ -250,7 +285,8 @@ export function ExcelImportForm() {
                   <h3 className="text-xl font-semibold text-foreground mb-2">Review Import</h3>
                   <p className="text-sm text-muted-foreground mb-4">
                       You are about to import <strong>{parsedData.length}</strong> records. 
-                      The first record will be imported as follows (other records will follow the same mapping):
+                      Customers may be auto-assigned to employees based on matching specialized regions (using the 'Category' field).
+                      A preview of the first record's mapping:
                   </p>
                   <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
                     {parsedData.length > 0 && customerFields.map(field => {
@@ -258,7 +294,7 @@ export function ExcelImportForm() {
                         const value = mappedHeader ? String(parsedData[0][mappedHeader]) : "Not Mapped";
                         return (
                             <div key={field} className="flex justify-between text-sm">
-                                <span className="font-medium capitalize text-muted-foreground">{field.replace(/([A-Z])/g, ' $1')}:</span>
+                                <span className="font-medium capitalize text-muted-foreground">{field.replace(/([A-Z])/g, ' $1')}{field === 'category' ? ' (as Region)' : ''}:</span>
                                 <span className="font-mono text-foreground truncate max-w-[60%]">{value}</span>
                             </div>
                         );
@@ -267,25 +303,25 @@ export function ExcelImportForm() {
                 </div>
 
                 <div>
-                  <Label htmlFor="assign-employee" className="text-base font-medium">Assign to Employee (Optional)</Label>
+                  <Label htmlFor="assign-employee" className="text-base font-medium">Default Assignee (Fallback)</Label>
                   <Select 
-                      onValueChange={(value) => setSelectedEmployeeId(value === "unassigned" ? null : value)} 
-                      value={selectedEmployeeId === null ? "unassigned" : selectedEmployeeId}
+                      onValueChange={(value) => setDefaultSelectedEmployeeId(value)} 
+                      value={defaultSelectedEmployeeId}
                   >
                       <SelectTrigger id="assign-employee" className="w-full md:w-1/2 mt-2 text-base">
-                          <SelectValue placeholder="Select employee to assign..." />
+                          <SelectValue placeholder="Select default employee..." />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="unassigned" className="text-base">Do not assign (Unassigned)</SelectItem>
+                          <SelectItem value="unassigned" className="text-base">Unassigned (or auto-assign by region)</SelectItem>
                           {employees.map((employee: User) => (
                               <SelectItem key={employee.id} value={employee.id} className="text-base">
-                                  {employee.name}
+                                  {employee.name} {employee.specializedRegion && `(${employee.specializedRegion})`}
                               </SelectItem>
                           ))}
                       </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                      All imported customers will be assigned to the selected employee. If none selected, they will be unassigned.
+                      Selected employee is a fallback. Customers matching an employee's specialized region (via 'Category' field) will be auto-assigned.
                   </p>
                 </div>
 

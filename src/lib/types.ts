@@ -4,9 +4,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password?: string; // Added for mock authentication, in real app use passwordHash
+  password?: string; // Stored for mock authentication. In real app, use passwordHash.
   role: UserRole;
   avatarUrl?: string;
+  specializedRegion?: string; // e.g., "USA", "Australia", "UK"
   // assignedCustomerIds: string[]; // This is an alternative data model.
   // Currently, customer assignment is handled by Customer.assignedTo (employee ID).
 }
@@ -18,7 +19,7 @@ export interface Customer {
   name: string;
   email: string;
   phoneNumber: string;
-  category?: string; // Generic category/tag, e.g., 'USA', 'UK', 'Tech Lead'
+  category?: string; // Generic category/tag, e.g., 'USA', 'UK', 'Tech Lead'. Used for regional matching.
   status: CustomerStatus;
   assignedTo: string | null; // Employee ID
   notes?: string;
