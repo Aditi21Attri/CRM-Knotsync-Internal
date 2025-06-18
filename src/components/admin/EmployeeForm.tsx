@@ -19,13 +19,20 @@ import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose
 import { useData } from "@/contexts/DataContext";
 import type { User, UserRole } from "@/lib/types";
 
-const employeeFormSchema = z.object({
+const employeeFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   role: z.enum(['admin', 'employee'], { required_error: "Role is required." }),
 });
 
-type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
+// Schema for adding an employee (password is required)
+const addEmployeeFormSchema = employeeFormSchemaBase.extend({
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+// Schema for editing an employee (password is optional or not included)
+const editEmployeeFormSchema = employeeFormSchemaBase;
+
 
 interface EmployeeFormProps {
   employee?: User; // Optional: for editing an existing employee
@@ -34,21 +41,29 @@ interface EmployeeFormProps {
 
 export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
   const { addEmployee, updateEmployee } = useData();
+  
+  const currentFormSchema = employee ? editEmployeeFormSchema : addEmployeeFormSchema;
+  type EmployeeFormValues = z.infer<typeof currentFormSchema>;
 
   const form = useForm<EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
+    resolver: zodResolver(currentFormSchema),
     defaultValues: {
       name: employee?.name || "",
       email: employee?.email || "",
       role: employee?.role || "employee",
+      // Conditionally add password only if it exists in the schema (i.e., for adding)
+      ...(currentFormSchema === addEmployeeFormSchema && { password: "" }),
     },
   });
 
   function onSubmit(data: EmployeeFormValues) {
     if (employee) {
-      updateEmployee(employee.id, data);
+      // For editing, we don't handle password changes in this form
+      const { ...editData } = data as z.infer<typeof editEmployeeFormSchema>; // Cast to edit schema
+      updateEmployee(employee.id, editData);
     } else {
-      addEmployee(data);
+      // For adding, password is included
+      addEmployee(data as z.infer<typeof addEmployeeFormSchema>); // Cast to add schema
     }
     form.reset();
     onFormSubmit?.();
@@ -60,7 +75,7 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
         <DialogHeader>
           <DialogTitle className="font-headline">{employee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
           <DialogDescription>
-            {employee ? "Update the details and role of the employee." : "Enter the details and assign a role for the new employee."}
+            {employee ? "Update the details and role of the employee." : "Enter the details, assign a role, and set a password for the new employee."}
           </DialogDescription>
         </DialogHeader>
         
@@ -91,6 +106,21 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
               </FormItem>
             )}
           />
+          {!employee && ( // Only show password field when adding a new employee
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Enter password (min 6 characters)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
           <FormField
             control={form.control}
             name="role"

@@ -11,6 +11,7 @@ interface EmployeeCreationData {
   name: string;
   email: string;
   role: UserRole;
+  password?: string; // Password is now part of creation data
 }
 
 interface DataContextType {
@@ -22,7 +23,7 @@ interface DataContextType {
   assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
   addEmployee: (employeeData: EmployeeCreationData) => Promise<void>;
-  updateEmployee: (employeeId: string, updatedData: Partial<EmployeeCreationData>) => Promise<void>;
+  updateEmployee: (employeeId: string, updatedData: Partial<Omit<EmployeeCreationData, 'password'>>) => Promise<void>; // Password update not handled here
   dataLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -121,8 +122,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addEmployee = async (employeeData: EmployeeCreationData) => {
+    if (!employeeData.password) { // Should be guaranteed by form, but good to check
+        toast({ title: "Error", description: "Password is required for new employees.", variant: "destructive" });
+        return;
+    }
     try {
-      const newEmployee = await addEmployeeAction(employeeData);
+      const newEmployee = await addEmployeeAction(employeeData as Required<EmployeeCreationData>); // Ensure password is sent
       setUsers(prev => [newEmployee, ...prev]);
       if (newEmployee.role === 'employee') {
         setEmployees(prev => [newEmployee, ...prev]);
@@ -134,14 +139,21 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateEmployee = async (employeeId: string, updatedData: Partial<EmployeeCreationData>) => {
+  const updateEmployee = async (employeeId: string, updatedData: Partial<Omit<EmployeeCreationData, 'password'>>) => {
     try {
       const updatedEmployee = await updateEmployeeAction(employeeId, updatedData);
       if (updatedEmployee) {
         setUsers(prevUsers => prevUsers.map(user => user.id === updatedEmployee.id ? updatedEmployee : user));
+        
+        // Update employees array based on role
+        const isCurrentlyEmployee = employees.some(emp => emp.id === updatedEmployee.id);
         if (updatedEmployee.role === 'employee') {
-          setEmployees(prevEmps => prevEmps.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
-        } else { // if role changed from employee to admin
+          if (isCurrentlyEmployee) {
+            setEmployees(prevEmps => prevEmps.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+          } else {
+            setEmployees(prevEmps => [...prevEmps, updatedEmployee]);
+          }
+        } else { // Role is admin or something else
           setEmployees(prevEmps => prevEmps.filter(emp => emp.id !== updatedEmployee.id));
         }
         toast({ title: "Employee Updated", description: `${updatedEmployee.name}'s details have been updated.`});

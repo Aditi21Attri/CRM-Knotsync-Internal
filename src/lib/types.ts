@@ -4,9 +4,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string; // Added for mock authentication, in real app use passwordHash
   role: UserRole;
   avatarUrl?: string;
-  // passwordHash is not included as this is a mock authentication system.
   // assignedCustomerIds: string[]; // This is an alternative data model.
   // Currently, customer assignment is handled by Customer.assignedTo (employee ID).
 }

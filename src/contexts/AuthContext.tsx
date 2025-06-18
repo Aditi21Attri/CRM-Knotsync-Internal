@@ -1,15 +1,15 @@
 
 "use client";
 
-import type { User, UserRole } from '@/lib/types';
+import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { mockUsers } from '@/lib/mockData';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
+import { authenticateUser } from '@/lib/actions/userActions'; // Import the new action
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, password: string) => Promise<void>; // Updated signature
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -20,19 +20,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   useEffect(() => {
+    setIsLoading(true);
     try {
       const storedUser = localStorage.getItem('currentUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
-        const validUser = mockUsers.find(u => u.id === parsedUser.id && u.email === parsedUser.email);
-        if (validUser) {
-          setCurrentUser(validUser);
-        } else {
-          localStorage.removeItem('currentUser');
-        }
+        // We re-authenticate or re-validate if necessary, or trust localStorage for session persistence in prototype
+        // For simplicity, if a user is in localStorage, we set them.
+        // A real app would re-validate the session token with the backend.
+        setCurrentUser(parsedUser);
       }
     } catch (error) {
       console.error("Failed to parse stored user:", error);
@@ -43,27 +42,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const user = await authenticateUser(email, password);
 
-    const adminUser = mockUsers.find(
-      (user) => user.email.toLowerCase() === 'admin@crm.com' && user.role === 'admin'
-    );
-
-    if (adminUser && email.toLowerCase() === 'admin@crm.com' && password === 'Pass123') {
-      setCurrentUser(adminUser);
-      localStorage.setItem('currentUser', JSON.stringify(adminUser));
-      router.push('/dashboard');
-      toast({ title: "Login Successful", description: `Welcome back, ${adminUser.name}!` });
-    } else {
-      // Optional: Allow other mock users to login if their email matches, for testing other roles.
-      // This part can be removed if only admin login is desired.
-      const otherUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== adminUser?.id);
-      if (otherUser && password) { // Simplified check: if email matches and password is not empty
-        setCurrentUser(otherUser);
-        localStorage.setItem('currentUser', JSON.stringify(otherUser));
+      if (user) {
+        setCurrentUser(user);
+        localStorage.setItem('currentUser', JSON.stringify(user));
         router.push('/dashboard');
-        toast({ title: "Login Successful", description: `Welcome, ${otherUser.name}!`});
+        toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
       } else {
         toast({
           title: 'Login Failed',
@@ -71,8 +57,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           variant: 'destructive',
         });
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: 'Login Error',
+        description: 'An unexpected error occurred during login.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const logout = () => {
