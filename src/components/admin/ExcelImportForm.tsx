@@ -83,7 +83,7 @@ export function ExcelImportForm() {
              return;
         }
         setParsedData(results.data);
-        setHeaders(results.meta.fields);
+        setHeaders(results.meta.fields || []);
         const initialMapping = {} as Record<keyof MappedCustomerData, string>;
         customerFields.forEach(field => {
             const matchedHeader = results.meta.fields?.find(h => h.toLowerCase() === field.toLowerCase());
@@ -212,7 +212,7 @@ export function ExcelImportForm() {
                         <SelectValue placeholder="Select CSV Column" />
                         </SelectTrigger>
                         <SelectContent>
-                        {headers.map(header => (
+                        {headers.filter(h => h !== "").map(header => (
                             <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
                         ))}
                         </SelectContent>
@@ -317,5 +317,3 @@ export function ExcelImportForm() {
     </Card>
   );
 }
-
-    
