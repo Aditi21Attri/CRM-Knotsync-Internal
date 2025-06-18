@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { Customer, User, CustomerStatus } from "@/lib/types";
-import { getEmployeeNameById } from "@/lib/mockData"; // Using mockData helper for now
 import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-500 hover:bg-green-600",
@@ -49,10 +49,17 @@ export function CustomerTableAdmin() {
   const [currentPage, setCurrentPage] = useState(1);
   
   const getInitials = (name: string) => {
+    if (!name) return "??";
     const names = name.split(' ');
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
     return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
   }
+
+  const getEmployeeNameById = (employeeId: string | null): string => {
+    if (!employeeId) return 'Unassigned';
+    const employee = employees.find(user => user.id === employeeId);
+    return employee ? employee.name : 'Unknown Employee';
+  };
 
   const uniqueCategories = useMemo(() => {
     const categories = new Set(customers.map(c => c.category).filter(Boolean) as string[]);
@@ -89,7 +96,7 @@ export function CustomerTableAdmin() {
         const valA = a[sortConfig.key!];
         const valB = b[sortConfig.key!];
 
-        if (valA === null || valA === undefined) return 1; // Treat nulls/undefined as "greater"
+        if (valA === null || valA === undefined) return 1; 
         if (valB === null || valB === undefined) return -1;
         
         if (typeof valA === 'string' && typeof valB === 'string') {
@@ -137,7 +144,7 @@ export function CustomerTableAdmin() {
   };
 
 
-  if (dataLoading) return <p>Loading customers...</p>;
+  if (dataLoading) return <div className="flex justify-center items-center h-[calc(100vh-20rem)]"><LoadingSpinner message="Loading customers..." /></div>;
 
   return (
     <div className="space-y-4">
@@ -350,4 +357,3 @@ export function CustomerTableAdmin() {
     </div>
   );
 }
-

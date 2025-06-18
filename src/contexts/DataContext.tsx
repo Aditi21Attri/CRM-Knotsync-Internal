@@ -1,10 +1,11 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole } from '@/lib/types';
-import { mockCustomers, mockUsers } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction } from '@/lib/actions/customerActions';
+import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction } from '@/lib/actions/userActions';
 
 interface EmployeeCreationData {
   name: string;
@@ -14,15 +15,16 @@ interface EmployeeCreationData {
 
 interface DataContextType {
   customers: Customer[];
-  users: User[]; // Includes admins and employees
-  employees: User[]; // Filtered list of only employees
-  addCustomer: (customerData: MappedCustomerData, assignedTo?: string | null, status?: CustomerStatus) => void;
-  updateCustomer: (updatedCustomer: Customer) => void;
-  assignCustomer: (customerId: string, employeeId: string | null) => void;
-  updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => void;
-  addEmployee: (employeeData: EmployeeCreationData) => void;
-  updateEmployee: (employeeId: string, updatedData: Partial<EmployeeCreationData>) => void;
+  users: User[]; 
+  employees: User[]; 
+  addCustomer: (customerData: MappedCustomerData, assignedTo?: string | null, status?: CustomerStatus) => Promise<void>;
+  updateCustomer: (customerId: string, updatedData: Partial<Customer>) => Promise<void>;
+  assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
+  updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
+  addEmployee: (employeeData: EmployeeCreationData) => Promise<void>;
+  updateEmployee: (employeeId: string, updatedData: Partial<EmployeeCreationData>) => Promise<void>;
   dataLoading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -30,89 +32,127 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [employees, setEmployees] = useState<User[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Simulate fetching data
-    setTimeout(() => {
-      setCustomers(mockCustomers);
-      setUsers(mockUsers);
+  const fetchData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [fetchedCustomers, fetchedUsers, fetchedEmployees] = await Promise.all([
+        getCustomers(),
+        getUsersAction(),
+        getEmployeesAction()
+      ]);
+      setCustomers(fetchedCustomers);
+      setUsers(fetchedUsers);
+      setEmployees(fetchedEmployees);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      toast({
+        title: "Error Loading Data",
+        description: "Could not load data from the server. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
       setDataLoading(false);
-    }, 500);
-  }, []);
+    }
+  }, [toast]);
 
-  const employees = users.filter(user => user.role === 'employee');
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const addCustomer = (customerData: MappedCustomerData, assignedTo: string | null = null, status: CustomerStatus = 'neutral') => {
-    const newCustomer: Customer = {
-      ...customerData,
-      id: `cust${Date.now()}${Math.random().toString(36).substring(2, 7)}`,
-      status,
-      assignedTo,
-      lastContacted: new Date().toISOString(),
-      notes: customerData.notes || '',
-    };
-    setCustomers(prev => [newCustomer, ...prev]);
-    toast({ title: "Customer Added", description: `${newCustomer.name} has been added successfully.` });
+  const addCustomer = async (customerData: MappedCustomerData, assignedTo: string | null = null, status: CustomerStatus = 'neutral') => {
+    try {
+      const newCustomer = await addCustomerAction(customerData, assignedTo, status);
+      setCustomers(prev => [newCustomer, ...prev]);
+      toast({ title: "Customer Added", description: `${newCustomer.name} has been added successfully.` });
+    } catch (error) {
+      console.error("Failed to add customer:", error);
+      toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" });
+    }
   };
 
-  const updateCustomer = (updatedCustomer: Customer) => {
-    setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? {...c, ...updatedCustomer, lastContacted: new Date().toISOString()} : c));
-    toast({ title: "Customer Updated", description: `${updatedCustomer.name}'s details have been updated.` });
+  const updateCustomer = async (customerId: string, updatedData: Partial<Customer>) => {
+    try {
+      const updatedCustomer = await updateCustomerAction(customerId, updatedData);
+      if (updatedCustomer) {
+        setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+        toast({ title: "Customer Updated", description: `${updatedCustomer.name}'s details have been updated.` });
+      } else {
+        throw new Error("Customer not found or update failed");
+      }
+    } catch (error) {
+      console.error("Failed to update customer:", error);
+      toast({ title: "Error", description: "Failed to update customer.", variant: "destructive" });
+    }
   };
   
-  const assignCustomer = (customerId: string, employeeId: string | null) => {
-    setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, assignedTo: employeeId, lastContacted: new Date().toISOString() } : c));
-    const customer = customers.find(c => c.id === customerId);
-    const employee = users.find(u => u.id === employeeId);
-    if (customer) {
-      toast({ title: "Customer Assigned", description: `${customer.name} assigned to ${employee ? employee.name : 'Unassigned'}.` });
-    }
-  };
-
-  const updateCustomerStatus = (customerId: string, status: CustomerStatus, notes?: string) => {
-    setCustomers(prev => prev.map(c => {
-      if (c.id === customerId) {
-        return { 
-          ...c, 
-          status, 
-          notes: notes ? (c.notes ? `${c.notes}\n${new Date().toLocaleDateString()}: ${notes}` : `${new Date().toLocaleDateString()}: ${notes}`) : c.notes,
-          lastContacted: new Date().toISOString() 
-        };
+  const assignCustomer = async (customerId: string, employeeId: string | null) => {
+    try {
+      const updatedCustomer = await assignCustomerAction(customerId, employeeId);
+      if (updatedCustomer) {
+        setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+        const employee = users.find(u => u.id === employeeId);
+        toast({ title: "Customer Assigned", description: `${updatedCustomer.name} assigned to ${employee ? employee.name : 'Unassigned'}.` });
+      } else {
+        throw new Error("Customer not found or assignment failed");
       }
-      return c;
-    }));
-    const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-      toast({ title: "Customer Status Updated", description: `${customer.name} status set to ${status}.` });
+    } catch (error) {
+      console.error("Failed to assign customer:", error);
+      toast({ title: "Error", description: "Failed to assign customer.", variant: "destructive" });
     }
   };
 
-  const addEmployee = (employeeData: EmployeeCreationData) => {
-    const newEmployee: User = {
-      ...employeeData,
-      id: `emp${Date.now()}${Math.random().toString(36).substring(2, 5)}`,
-      avatarUrl: `https://placehold.co/100x100/E5EAF7/2962FF?text=${employeeData.name.substring(0,2).toUpperCase()}`, // Using initials for placeholder
-    };
-    setUsers(prev => [newEmployee, ...prev]);
-    toast({ title: "Employee Added", description: `${newEmployee.name} has been added as an ${newEmployee.role}.` });
-  };
-
-  const updateEmployee = (employeeId: string, updatedData: Partial<EmployeeCreationData>) => {
-    setUsers(prevUsers => 
-      prevUsers.map(user => 
-        user.id === employeeId 
-          ? { ...user, ...updatedData, avatarUrl: user.avatarUrl || `https://placehold.co/100x100/E5EAF7/2962FF?text=${(updatedData.name || user.name).substring(0,2).toUpperCase()}` } // Retain or update avatar
-          : user
-      )
-    );
-    const employee = users.find(u => u.id === employeeId);
-    if (employee) {
-      toast({ title: "Employee Updated", description: `${updatedData.name || employee.name}'s details have been updated.`});
+  const updateCustomerStatus = async (customerId: string, status: CustomerStatus, notes?: string) => {
+    try {
+      const updatedCustomer = await updateCustomerStatusAction(customerId, status, notes);
+      if (updatedCustomer) {
+        setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+        toast({ title: "Customer Status Updated", description: `${updatedCustomer.name} status set to ${status}.` });
+      } else {
+        throw new Error("Customer not found or status update failed");
+      }
+    } catch (error) {
+      console.error("Failed to update customer status:", error);
+      toast({ title: "Error", description: "Failed to update customer status.", variant: "destructive" });
     }
   };
 
+  const addEmployee = async (employeeData: EmployeeCreationData) => {
+    try {
+      const newEmployee = await addEmployeeAction(employeeData);
+      setUsers(prev => [newEmployee, ...prev]);
+      if (newEmployee.role === 'employee') {
+        setEmployees(prev => [newEmployee, ...prev]);
+      }
+      toast({ title: "Employee Added", description: `${newEmployee.name} has been added as an ${newEmployee.role}.` });
+    } catch (error) {
+      console.error("Failed to add employee:", error);
+      toast({ title: "Error", description: "Failed to add employee.", variant: "destructive" });
+    }
+  };
+
+  const updateEmployee = async (employeeId: string, updatedData: Partial<EmployeeCreationData>) => {
+    try {
+      const updatedEmployee = await updateEmployeeAction(employeeId, updatedData);
+      if (updatedEmployee) {
+        setUsers(prevUsers => prevUsers.map(user => user.id === updatedEmployee.id ? updatedEmployee : user));
+        if (updatedEmployee.role === 'employee') {
+          setEmployees(prevEmps => prevEmps.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+        } else { // if role changed from employee to admin
+          setEmployees(prevEmps => prevEmps.filter(emp => emp.id !== updatedEmployee.id));
+        }
+        toast({ title: "Employee Updated", description: `${updatedEmployee.name}'s details have been updated.`});
+      } else {
+        throw new Error("Employee not found or update failed");
+      }
+    } catch (error) {
+      console.error("Failed to update employee:", error);
+      toast({ title: "Error", description: "Failed to update employee.", variant: "destructive" });
+    }
+  };
 
   return (
     <DataContext.Provider value={{ 
@@ -125,7 +165,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateCustomerStatus, 
       addEmployee,
       updateEmployee,
-      dataLoading
+      dataLoading,
+      refreshData: fetchData,
     }}>
       {children}
     </DataContext.Provider>
