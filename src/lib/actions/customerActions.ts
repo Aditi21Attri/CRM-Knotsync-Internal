@@ -177,3 +177,15 @@ export async function unassignCustomersByEmployeeId(employeeId: string): Promise
     throw new Error(`Failed to unassign customers. Details: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+export async function deleteAllCustomersAction(): Promise<{ success: boolean; deletedCount: number }> {
+  try {
+    const db = await connectToDatabase();
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const result = await customersCollection.deleteMany({}); // Empty filter deletes all
+    return { success: true, deletedCount: result.deletedCount };
+  } catch (error) {
+    console.error('Failed to delete all customers:', error);
+    throw new Error(`Failed to delete all customers. Details: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

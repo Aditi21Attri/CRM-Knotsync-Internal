@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction } from '@/lib/actions/customerActions';
+import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction, deleteAllCustomersAction } from '@/lib/actions/customerActions';
 import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData, deleteEmployeeAction, toggleEmployeeSuspensionAction } from '@/lib/actions/userActions';
 
 interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
@@ -19,6 +19,7 @@ interface DataContextType {
   updateCustomer: (customerId: string, updatedData: Partial<Customer>) => Promise<void>;
   assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
+  deleteAllCustomers: () => Promise<void>;
   addEmployee: (employeeData: EmployeeCreationData) => Promise<void>;
   updateEmployee: (employeeId: string, updatedData: EmployeeUpdateData) => Promise<void>;
   deleteEmployee: (employeeId: string) => Promise<void>;
@@ -119,6 +120,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteAllCustomers = async () => {
+    try {
+      const result = await deleteAllCustomersAction();
+      if (result.success) {
+        setCustomers([]); // Clear local state
+        toast({
+          title: "All Customers Deleted",
+          description: `${result.deletedCount} customer(s) have been removed from the system.`,
+        });
+      } else {
+        throw new Error("Failed to delete all customers on the server.");
+      }
+    } catch (error) {
+      console.error("Failed to delete all customers:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete all customers. ${error instanceof Error ? error.message : "An unknown error occurred."}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const addEmployee = async (employeeData: EmployeeCreationData) => {
     try {
       const newEmployee = await addEmployeeAction(employeeData); 
@@ -204,6 +227,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateCustomer,
       assignCustomer, 
       updateCustomerStatus, 
+      deleteAllCustomers,
       addEmployee,
       updateEmployee,
       deleteEmployee,
