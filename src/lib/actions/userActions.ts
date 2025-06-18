@@ -45,7 +45,7 @@ export async function getEmployees(): Promise<User[]> {
 export async function addEmployeeAction(employeeData: EmployeeCreationData): Promise<User> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
     
     const newEmployeeData = {
       ...employeeData,
@@ -58,10 +58,19 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
       throw new Error('Failed to insert employee');
     }
     
+    // Retrieve the inserted document to ensure all fields, including _id, are correctly formed
+    const insertedDoc = await usersCollection.findOne({ _id: result.insertedId });
+    if (!insertedDoc) {
+        throw new Error('Failed to retrieve inserted employee');
+    }
+
+    const { _id, ...restOfDoc } = insertedDoc;
+
     return {
-      ...newEmployeeData,
-      id: result.insertedId.toString(),
-    };
+      id: _id.toString(),
+      ...restOfDoc,
+    } as User;
+
   } catch (error) {
     console.error('Failed to add employee:', error);
     throw new Error('Failed to add employee.');
@@ -71,9 +80,9 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
 export async function updateEmployeeAction(employeeId: string, updatedData: Partial<EmployeeCreationData>): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
     
-    const updatePayload: Partial<User> = { ...updatedData };
+    const updatePayload: Partial<Omit<User, 'id'>> = { ...updatedData };
     if (updatedData.name && !updatedData.avatarUrl) {
         updatePayload.avatarUrl = `https://placehold.co/100x100/E5EAF7/2962FF?text=${updatedData.name.substring(0,2).toUpperCase()}`;
     }
@@ -96,3 +105,4 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
     throw new Error('Failed to update employee.');
   }
 }
+
