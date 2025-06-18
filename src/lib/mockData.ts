@@ -1,10 +1,11 @@
+
 import type { User, Customer, UserRole, CustomerStatus } from './types';
 
 // Note: mockUsers and mockCustomers will no longer be the primary source of data
 // after MongoDB integration. They can be kept for reference or seeding scripts.
 
 export const mockUsers: User[] = [
-  { id: 'admin001', name: 'Admin User', email: 'admin@stratagem.crm', role: 'admin', avatarUrl: 'https://placehold.co/100x100/cccccc/2962ff' },
+  { id: 'admin001', name: 'Admin User', email: 'admin@crm.com', role: 'admin', avatarUrl: 'https://placehold.co/100x100/cccccc/2962ff' },
   { id: 'emp001', name: 'Alice Wonderland', email: 'alice@stratagem.crm', role: 'employee', avatarUrl: 'https://placehold.co/100x100/E5EAF7/2962FF' },
   { id: 'emp002', name: 'Bob The Builder', email: 'bob@stratagem.crm', role: 'employee', avatarUrl: 'https://placehold.co/100x100/E5EAF7/8A2BE2' },
   { id: 'emp003', name: 'Charlie Chaplin', email: 'charlie@stratagem.crm', role: 'employee', avatarUrl: 'https://placehold.co/100x100/E5EAF7/FFD700' },
