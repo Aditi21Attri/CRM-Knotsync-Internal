@@ -6,6 +6,9 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  // passwordHash is not included as this is a mock authentication system.
+  // assignedCustomerIds: string[]; // This is an alternative data model.
+  // Currently, customer assignment is handled by Customer.assignedTo (employee ID).
 }
 
 export type CustomerStatus = 'hot' | 'cold' | 'neutral';
