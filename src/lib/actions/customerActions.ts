@@ -9,11 +9,14 @@ export async function getCustomers(): Promise<Customer[]> {
   try {
     const db = await connectToDatabase();
     const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
-    const customersFromDb = await customersCollection.find({}).toArray();
-    return customersFromDb.map(customer => ({
-      ...customer,
-      id: (customer as any)._id.toString(),
-    }));
+    const customersFromDb = await customersCollection.find({}).sort({ lastContacted: -1 }).toArray(); // Sort by lastContacted descending
+    return customersFromDb.map(customerDoc => {
+      const { _id, ...restOfDoc } = customerDoc;
+      return {
+        id: _id.toString(),
+        ...restOfDoc,
+      } as Customer; // Ensure correct type casting
+    });
   } catch (error) {
     console.error('Failed to fetch customers:', error);
     throw new Error('Failed to fetch customers.');
@@ -27,25 +30,31 @@ export async function addCustomerAction(
 ): Promise<Customer> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection('customers');
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
-    const newCustomerData = {
-      ...customerData,
-      status,
-      assignedTo,
+    // Construct the document to be inserted, ensuring all fields of Customer are considered
+    const newCustomerDbData: Omit<Customer, 'id'> = {
+      name: customerData.name,
+      email: customerData.email,
+      phoneNumber: customerData.phoneNumber,
+      category: customerData.category,
+      status: status,
+      assignedTo: assignedTo,
+      notes: customerData.notes || '', // Ensure notes is always a string
       lastContacted: new Date().toISOString(),
-      notes: customerData.notes || '',
+      // Include any other fields from MappedCustomerData that are part of Customer
+      ...Object.fromEntries(Object.entries(customerData).filter(([key]) => !['name', 'email', 'phoneNumber', 'category', 'notes'].includes(key)))
     };
     
-    const result = await customersCollection.insertOne(newCustomerData);
+    const result = await customersCollection.insertOne(newCustomerDbData);
 
     if (!result.insertedId) {
-      throw new Error('Failed to insert customer');
+      throw new Error('MongoDB insertOne operation completed but did not return an insertedId for customer.');
     }
     
     const insertedDoc = await customersCollection.findOne({ _id: result.insertedId });
     if (!insertedDoc) {
-        throw new Error('Failed to retrieve inserted customer');
+        throw new Error('Failed to retrieve the newly inserted customer from the database using its ID.');
     }
 
     const { _id, ...restOfDoc } = insertedDoc;
@@ -53,24 +62,26 @@ export async function addCustomerAction(
     return {
       id: _id.toString(),
       ...restOfDoc,
-    } as Customer;
+    } as Customer; // Ensure correct type casting
 
   } catch (error) {
     console.error('Failed to add customer:', error);
-    throw new Error('Failed to add customer.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to add customer. Details: ${errorMessage}`);
   }
 }
 
-export async function updateCustomerAction(customerId: string, updatedCustomerData: Partial<Customer>): Promise<Customer | null> {
+export async function updateCustomerAction(customerId: string, updatedCustomerData: Partial<Omit<Customer, 'id'>>): Promise<Customer | null> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection('customers');
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
+    // Ensure lastContacted is updated, and 'id' is not in the $set payload
     const updatePayload = { 
         ...updatedCustomerData, 
         lastContacted: new Date().toISOString() 
     };
-    delete updatePayload.id; 
+     // delete (updatePayload as any).id; // Should not be needed if updatedCustomerData is Partial<Omit<Customer, 'id'>>
 
     const result = await customersCollection.findOneAndUpdate(
       { _id: new ObjectId(customerId) },
@@ -79,51 +90,54 @@ export async function updateCustomerAction(customerId: string, updatedCustomerDa
     );
     
     if (!result) {
-      return null;
+      return null; // Customer not found
     }
     const { _id, ...restOfCustomer } = result;
-    return { id: _id.toString(), ...restOfCustomer } as Customer;
+    return { id: _id.toString(), ...restOfCustomer } as Customer; // Ensure correct type casting
   } catch (error) {
     console.error('Failed to update customer:', error);
-    throw new Error('Failed to update customer.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to update customer. Details: ${errorMessage}`);
   }
 }
 
 export async function assignCustomerAction(customerId: string, employeeId: string | null): Promise<Customer | null> {
    try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection('customers');
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     const result = await customersCollection.findOneAndUpdate(
       { _id: new ObjectId(customerId) },
       { $set: { assignedTo: employeeId, lastContacted: new Date().toISOString() } },
       { returnDocument: 'after' }
     );
      if (!result) {
-      return null;
+      return null; // Customer not found
     }
     const { _id, ...restOfCustomer } = result;
-    return { id: _id.toString(), ...restOfCustomer } as Customer;
+    return { id: _id.toString(), ...restOfCustomer } as Customer; // Ensure correct type casting
   } catch (error) {
     console.error('Failed to assign customer:', error);
-    throw new Error('Failed to assign customer.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to assign customer. Details: ${errorMessage}`);
   }
 }
 
 export async function updateCustomerStatusAction(customerId: string, status: CustomerStatus, notes?: string): Promise<Customer | null> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection('customers');
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
     const customerDoc = await customersCollection.findOne({ _id: new ObjectId(customerId) });
-    if (!customerDoc) return null;
+    if (!customerDoc) return null; // Customer not found
 
-    const updatePayload: any = { 
+    const updatePayload: Partial<Omit<Customer, 'id'>> = { 
       status, 
       lastContacted: new Date().toISOString() 
     };
-    if (notes) {
-      const newNoteEntry = `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}: ${notes}`;
-      updatePayload.notes = customerDoc.notes 
+
+    if (notes && notes.trim() !== '') {
+      const newNoteEntry = `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}: ${notes.trim()}`;
+      updatePayload.notes = customerDoc.notes && customerDoc.notes.trim() !== ''
         ? `${customerDoc.notes}\n${newNoteEntry}` 
         : newNoteEntry;
     }
@@ -135,14 +149,13 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
     );
 
     if (!result) {
-      return null;
+      return null; // Should not happen if findOne above succeeded, but good practice
     }
     const { _id, ...restOfCustomer } = result;
-    return { id: _id.toString(), ...restOfCustomer } as Customer;
-  } catch (error)
-   {
+    return { id: _id.toString(), ...restOfCustomer } as Customer; // Ensure correct type casting
+  } catch (error) {
     console.error('Failed to update customer status:', error);
-    throw new Error('Failed to update customer status.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to update customer status. Details: ${errorMessage}`);
   }
 }
-

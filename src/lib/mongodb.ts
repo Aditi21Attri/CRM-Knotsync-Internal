@@ -12,18 +12,17 @@ if (!dbName) {
 }
 
 let client: MongoClient;
-let db: Db;
+let dbInstance: Db; // Renamed to avoid conflict with global 'db' type if any
 
 // Use a global variable to preserve the client across hot reloads in development
-// See: https://github.com/vercel/next.js/pull/17666
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
 async function connectToDatabase(): Promise<Db> {
-  if (db) {
-    return db;
+  if (dbInstance) {
+    return dbInstance;
   }
 
   if (process.env.NODE_ENV === 'development') {
@@ -37,8 +36,8 @@ async function connectToDatabase(): Promise<Db> {
     await client.connect();
   }
   
-  db = client.db(dbName);
-  return db;
+  dbInstance = client.db(dbName);
+  return dbInstance;
 }
 
 export { connectToDatabase };

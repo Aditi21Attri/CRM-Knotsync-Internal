@@ -15,7 +15,7 @@ interface EmployeeCreationData {
 export async function getUsers(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection<Omit<User, 'id'>>('users'); // Specify document type
     const usersFromDb = await usersCollection.find({}).toArray();
     
     return usersFromDb.map(userDoc => {
@@ -38,7 +38,7 @@ export async function getUsers(): Promise<User[]> {
 export async function getEmployees(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection<Omit<User, 'id'>>('users'); // Specify document type
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
@@ -77,16 +77,17 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
       throw new Error('MongoDB insertOne operation completed but did not return an insertedId.');
     }
 
+    // Fetch the newly inserted document to ensure correct transformation
     const insertedDoc = await usersCollection.findOne({ _id: result.insertedId });
 
     if (!insertedDoc) {
         throw new Error('Failed to retrieve the newly inserted employee from the database using its ID.');
     }
 
+    // Transform the MongoDB document to the User type
     const { _id, ...restOfDoc } = insertedDoc;
-
     const finalUser: User = {
-      id: _id.toString(),
+      id: _id.toString(), // Convert ObjectId to string
       name: restOfDoc.name,
       email: restOfDoc.email,
       role: restOfDoc.role,
@@ -95,7 +96,9 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
     return finalUser;
 
   } catch (error) {
+    // Log the full original error for better debugging
     console.error('Full error in addEmployeeAction:', error); 
+    // Re-throw a more specific error or the original error
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to add employee. Details: ${errorMessage}`);
   }
@@ -104,26 +107,28 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
 export async function updateEmployeeAction(employeeId: string, updatedData: Partial<EmployeeCreationData>): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection<Omit<User, 'id'>>('users'); // Specify document type
     
+    // Prepare the update payload, ensuring no 'id' field is sent
     const updatePayload: Partial<Omit<User, 'id'>> = { ...updatedData };
-    if (updatedData.name && !updatedData.avatarUrl) {
+    if (updatedData.name && !updatedData.avatarUrl) { // Auto-generate avatar if name changes and no new avatar provided
         updatePayload.avatarUrl = `https://placehold.co/100x100/E5EAF7/2962FF?text=${updatedData.name.substring(0,2).toUpperCase()}`;
     }
     
     const result = await usersCollection.findOneAndUpdate(
       { _id: new ObjectId(employeeId) },
       { $set: updatePayload },
-      { returnDocument: 'after' }
+      { returnDocument: 'after' } // Ensures the updated document is returned
     );
     
     if (!result) {
-      return null;
+      return null; // Or throw an error if employee not found
     }
     
+    // Transform the MongoDB document to the User type
     const { _id, ...restOfUser } = result;
     const updatedUser: User = {
-      id: _id.toString(),
+      id: _id.toString(), // Convert ObjectId to string
       name: restOfUser.name,
       email: restOfUser.email,
       role: restOfUser.role,
