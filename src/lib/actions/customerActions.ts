@@ -43,10 +43,18 @@ export async function addCustomerAction(
       throw new Error('Failed to insert customer');
     }
     
+    // Retrieve the inserted document to ensure all fields, including _id, are correctly formed
+    const insertedDoc = await customersCollection.findOne({ _id: result.insertedId });
+    if (!insertedDoc) {
+        throw new Error('Failed to retrieve inserted customer');
+    }
+
+    const { _id, ...restOfDoc } = insertedDoc;
+
     return {
-      ...newCustomerData,
-      id: result.insertedId.toString(),
-    } as Customer; // Cast needed due to dynamic keys from MappedCustomerData
+      id: _id.toString(),
+      ...restOfDoc,
+    } as Customer;
 
   } catch (error) {
     console.error('Failed to add customer:', error);
