@@ -45,7 +45,7 @@ export async function getEmployees(): Promise<User[]> {
 export async function addEmployeeAction(employeeData: EmployeeCreationData): Promise<User> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users'); 
     
     const newEmployeeData = {
       ...employeeData,
@@ -58,7 +58,6 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
       throw new Error('Failed to insert employee');
     }
     
-    // Retrieve the inserted document to ensure all fields, including _id, are correctly formed
     const insertedDoc = await usersCollection.findOne({ _id: result.insertedId });
     if (!insertedDoc) {
         throw new Error('Failed to retrieve inserted employee');
@@ -80,7 +79,7 @@ export async function addEmployeeAction(employeeData: EmployeeCreationData): Pro
 export async function updateEmployeeAction(employeeId: string, updatedData: Partial<EmployeeCreationData>): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     
     const updatePayload: Partial<Omit<User, 'id'>> = { ...updatedData };
     if (updatedData.name && !updatedData.avatarUrl) {

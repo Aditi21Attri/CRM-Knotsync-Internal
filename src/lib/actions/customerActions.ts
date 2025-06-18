@@ -43,7 +43,6 @@ export async function addCustomerAction(
       throw new Error('Failed to insert customer');
     }
     
-    // Retrieve the inserted document to ensure all fields, including _id, are correctly formed
     const insertedDoc = await customersCollection.findOne({ _id: result.insertedId });
     if (!insertedDoc) {
         throw new Error('Failed to retrieve inserted customer');
@@ -71,7 +70,7 @@ export async function updateCustomerAction(customerId: string, updatedCustomerDa
         ...updatedCustomerData, 
         lastContacted: new Date().toISOString() 
     };
-    delete updatePayload.id; // Don't try to update the 'id' field itself
+    delete updatePayload.id; 
 
     const result = await customersCollection.findOneAndUpdate(
       { _id: new ObjectId(customerId) },
@@ -123,9 +122,10 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
       lastContacted: new Date().toISOString() 
     };
     if (notes) {
+      const newNoteEntry = `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}: ${notes}`;
       updatePayload.notes = customerDoc.notes 
-        ? `${customerDoc.notes}\n${new Date().toLocaleDateString()}: ${notes}` 
-        : `${new Date().toLocaleDateString()}: ${notes}`;
+        ? `${customerDoc.notes}\n${newNoteEntry}` 
+        : newNoteEntry;
     }
     
     const result = await customersCollection.findOneAndUpdate(
@@ -145,3 +145,4 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
     throw new Error('Failed to update customer status.');
   }
 }
+
