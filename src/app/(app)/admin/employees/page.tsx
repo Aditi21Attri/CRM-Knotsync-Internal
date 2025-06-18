@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Users, Edit2, Trash2, Ban, PlayCircle, AlertTriangle } from "lucide-react";
+import { PlusCircle, Users, Edit2, Trash2, Ban, PlayCircle, AlertTriangle, Briefcase } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -38,7 +38,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 
 export default function ManageEmployeesPage() {
-  const { employees, dataLoading, deleteEmployee, toggleEmployeeSuspension } = useData(); 
+  const { employees, customers, dataLoading, deleteEmployee, toggleEmployeeSuspension } = useData(); 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<User | undefined>(undefined);
   const [employeeToDelete, setEmployeeToDelete] = useState<User | null>(null);
@@ -70,6 +70,10 @@ export default function ManageEmployeesPage() {
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
     return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
   }
+
+  const getAssignedCustomersCount = (employeeId: string) => {
+    return customers.filter(customer => customer.assignedTo === employeeId).length;
+  };
 
   if (dataLoading) {
     return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><LoadingSpinner message="Loading employee data..." /></div>;
@@ -143,6 +147,7 @@ export default function ManageEmployeesPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Assigned Customers</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right w-[160px]">Actions</TableHead>
               </TableRow>
@@ -165,6 +170,12 @@ export default function ManageEmployeesPage() {
                     <Badge variant={employee.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
                       {employee.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" />
+                      {getAssignedCustomersCount(employee.id)}
+                    </div>
                   </TableCell>
                    <TableCell>
                     <Badge 
@@ -206,3 +217,4 @@ export default function ManageEmployeesPage() {
     </div>
   );
 }
+
