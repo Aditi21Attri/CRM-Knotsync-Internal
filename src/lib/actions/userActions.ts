@@ -234,38 +234,54 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
     
     const userDoc = await usersCollection.findOne({ email: email.toLowerCase() });
 
-    if (!userDoc) {
-      return null; 
-    }
-    
-    if (!userDoc.password) {
-        console.warn(`User ${email} has no password set in the database.`);
-        return null; // User has no password set, cannot authenticate
-    }
+    if (userDoc) {
+      if (!userDoc.password) {
+          console.warn(`User ${email} has no password set in the database.`);
+          return null; 
+      }
 
-    if (userDoc.status === 'suspended') {
-      return null; 
-    }
+      if (userDoc.status === 'suspended') {
+        return null; 
+      }
 
-    if (userDoc.password === passwordAttempt) {
-      const { _id, password, ...restOfDoc } = userDoc; // Exclude password from returned object
-      const user: User = {
-        id: _id.toString(),
-        name: restOfDoc.name,
-        email: restOfDoc.email,
-        role: restOfDoc.role,
-        status: restOfDoc.status || 'active', 
-        avatarUrl: restOfDoc.avatarUrl,
-        specializedRegion: restOfDoc.specializedRegion,
-        resetPasswordToken: restOfDoc.resetPasswordToken,
-        resetPasswordExpires: restOfDoc.resetPasswordExpires,
-      };
-      return user; 
+      if (userDoc.password === passwordAttempt) {
+        const { _id, password, ...restOfDoc } = userDoc; 
+        const user: User = {
+          id: _id.toString(),
+          name: restOfDoc.name,
+          email: restOfDoc.email,
+          role: restOfDoc.role,
+          status: restOfDoc.status || 'active', 
+          avatarUrl: restOfDoc.avatarUrl,
+          specializedRegion: restOfDoc.specializedRegion,
+          resetPasswordToken: restOfDoc.resetPasswordToken,
+          resetPasswordExpires: restOfDoc.resetPasswordExpires,
+        };
+        return user; 
+      }
+    } else {
+      // Fallback for super@admin.com if not found in DB - FOR PROTOTYPING ONLY
+      if (email.toLowerCase() === 'super@admin.com' && passwordAttempt === '123admin') {
+        console.warn("Authenticated super@admin.com via hardcoded fallback. This user should ideally be added to the database via the UI.");
+        return {
+          id: 'superadmin-fallback-001', // Unique ID for the fallback user
+          name: 'Super Admin (Fallback)',
+          email: 'super@admin.com',
+          role: 'admin',
+          status: 'active',
+          avatarUrl: `https://placehold.co/100x100/2962FF/E5EAF7?text=SA`, // Placeholder avatar
+        };
+      }
     }
 
     return null; 
   } catch (error) {
     console.error('Error during user authentication:', error);
+    // Check for SSL-related errors specifically
+    if (error instanceof Error && error.message.includes('SSL routines')) {
+         console.error('An SSL/TLS error occurred during authentication. Check MONGODB_URI and server SSL configuration.');
+         throw new Error('Authentication failed due to a network security issue. Please contact support.');
+    }
     throw new Error('Authentication failed due to a server error.');
   }
 }
@@ -277,7 +293,6 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
     const user = await usersCollection.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      // Do not reveal if the user exists or not for security reasons
       return { success: true, message: "If your email is registered, you will receive a password reset link." };
     }
 
@@ -289,9 +304,8 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
       { $set: { resetPasswordToken: resetToken, resetPasswordExpires: resetPasswordExpires } }
     );
 
-    // Mock sending email. In a real app, you'd use an email service.
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/reset-password/${resetToken}`;
-    console.log(`Password Reset Link (for ${email}): ${resetUrl}`); // Log for prototype purposes
+    console.log(`Password Reset Link (for ${email}): ${resetUrl}`); 
 
     return { success: true, message: "If your email is registered, you will receive a password reset link. (Link logged to server console for prototype)" };
   } catch (error) {
@@ -326,7 +340,6 @@ export async function resetPassword(token: string, newPasswordValue: string): Pr
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
     
-    // Find user by token and ensure token is not expired
     const user = await usersCollection.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: new Date() },
@@ -336,11 +349,10 @@ export async function resetPassword(token: string, newPasswordValue: string): Pr
       return { success: false, message: "Password reset token is invalid or has expired." };
     }
 
-    // Update password and clear reset token fields
     await usersCollection.updateOne(
       { _id: user._id },
       { 
-        $set: { password: newPasswordValue }, // In a real app, hash the password here
+        $set: { password: newPasswordValue }, 
         $unset: { resetPasswordToken: "", resetPasswordExpires: "" } 
       }
     );
