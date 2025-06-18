@@ -2,19 +2,20 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link'; // Import Link
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Added Input
+import { Input } from "@/components/ui/input";
 import { useAuth } from '@/contexts/AuthContext';
-import { LogIn, Loader2 } from 'lucide-react'; // Added Loader2
+import { LogIn, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading: authIsLoading } = useAuth(); // Renamed isLoading to authIsLoading
+  const { login, isLoading: authIsLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,7 +36,16 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
 
-  if (authIsLoading && !isSubmitting) { // Show loading only for initial auth check
+  const handleForgotPassword = () => {
+    toast({
+      title: "Forgot Password",
+      description: "Password reset functionality is not fully implemented. Please contact an administrator for assistance.",
+      variant: "default",
+      duration: 5000,
+    });
+  };
+
+  if (authIsLoading && !isSubmitting) { 
      return (
         <div className="flex items-center justify-center min-h-screen bg-background">
           <div className="flex flex-col items-center space-y-4">
@@ -70,7 +80,17 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Button 
+                  type="button" // Important: type="button" to prevent form submission
+                  variant="link" 
+                  className="px-0 text-xs h-auto text-primary hover:underline"
+                  onClick={handleForgotPassword}
+                >
+                  Forgot Password?
+                </Button>
+              </div>
               <Input 
                 id="password" 
                 type="password" 
