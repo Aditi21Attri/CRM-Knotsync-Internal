@@ -60,8 +60,23 @@ export function ExcelImportForm() {
       skipEmptyLines: true,
       complete: (results) => {
         if (results.errors.length > 0) {
-          setError("Error parsing CSV file. Please check the file format.");
-          console.error("CSV Parsing errors:", results.errors);
+          const firstError = results.errors[0];
+          let userErrorMessage = "Error parsing CSV file. Please check the file format.";
+          // PapaParse errors have a 'row' property which is 0-indexed for data rows.
+          // Adding 2 to make it 1-indexed for user display (1 for header, 1 for 0-index to 1-index).
+          // If firstError.row is undefined, it means it's a general error not tied to a specific row.
+          const errorRowDisplay = firstError.row !== undefined ? firstError.row + 2 : 'unknown';
+
+          if (firstError) {
+            userErrorMessage = `Error parsing CSV (around line ${errorRowDisplay}): ${firstError.message}. Please check the file format.`;
+            console.error(
+              `CSV Parsing failed with ${results.errors.length} error(s). First error (around line ${errorRowDisplay}, code: ${firstError.code}): ${firstError.message}`,
+              firstError
+            );
+          } else {
+             console.error("CSV Parsing errors encountered:", results.errors);
+          }
+          setError(userErrorMessage);
           setIsLoading(false);
           return;
         }
@@ -302,3 +317,4 @@ export function ExcelImportForm() {
     </Card>
   );
 }
+
