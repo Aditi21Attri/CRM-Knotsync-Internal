@@ -60,15 +60,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         router.push('/dashboard');
         toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
       } else if (user && user.status === 'suspended') {
+        // This case might be redundant if authenticateUser already returns null for suspended users.
+        // However, it's a safeguard if authenticateUser's logic changes.
          toast({
           title: 'Account Suspended',
           description: 'Your account is currently suspended. Please contact an administrator.',
           variant: 'destructive',
         });
       } else {
+        // This handles:
+        // 1. authenticateUser returned null (user not found, password incorrect, or user was suspended in DB)
+        // 2. authenticateUser returned a user, but status is not 'active' (should be rare if authenticateUser is correct)
         toast({
           title: 'Login Failed',
-          description: 'Invalid email or password, or account may be inactive. Please try again.',
+          description: 'Invalid email or password, or account may be inactive/suspended. Please try again.',
           variant: 'destructive',
         });
       }
@@ -105,3 +110,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

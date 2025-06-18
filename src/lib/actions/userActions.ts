@@ -29,9 +29,9 @@ export async function getUsers(): Promise<User[]> {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        password: restOfDoc.password,
+        password: restOfDoc.password, // Still map password if present, though not sent to client via AuthContext
         role: restOfDoc.role,
-        status: restOfDoc.status || 'active',
+        status: restOfDoc.status || 'active', // Default to active
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
       };
@@ -47,6 +47,7 @@ export async function getEmployees(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    // Ensure we only fetch users explicitly marked with role 'employee'
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
@@ -56,7 +57,7 @@ export async function getEmployees(): Promise<User[]> {
         name: restOfDoc.name,
         email: restOfDoc.email,
         password: restOfDoc.password,
-        role: restOfDoc.role,
+        role: restOfDoc.role as 'employee', // Cast as employee role
         status: restOfDoc.status || 'active',
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
@@ -70,22 +71,22 @@ export async function getEmployees(): Promise<User[]> {
 }
 
 
-export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>> & Partial<EmployeeData>): Promise<User> {
+export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>> & Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password' | 'status'>>): Promise<User> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
 
-    const existingUser = await usersCollection.findOne({ email: employeeData.email });
+    const existingUser = await usersCollection.findOne({ email: employeeData.email.toLowerCase() });
     if (existingUser) {
       throw new Error('An employee with this email already exists.');
     }
 
     const newEmployeeDbData: Omit<User, 'id'> = {
       name: employeeData.name,
-      email: employeeData.email,
-      password: employeeData.password,
+      email: employeeData.email.toLowerCase(),
+      password: employeeData.password, // Store the provided password
       role: employeeData.role,
-      status: 'active', // Default status
+      status: 'active', // New employees are active by default
       avatarUrl: employeeData.avatarUrl || `https://placehold.co/100x100/E5EAF7/2962FF?text=${employeeData.name.substring(0,2).toUpperCase()}`,
       specializedRegion: employeeData.specializedRegion || undefined,
     };
@@ -103,13 +104,15 @@ export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData
     }
     
     const { _id, ...restOfDoc } = insertedDoc;
+    // Construct the User object to be returned, omitting password for security if it were hashed
     const finalUser: User = {
       id: _id.toString(),
       name: restOfDoc.name,
       email: restOfDoc.email,
-      password: restOfDoc.password,
+      // Do NOT return password to the client, even if it's just mapped from DB here.
+      // The AuthContext's currentUser should not have password.
       role: restOfDoc.role,
-      status: restOfDoc.status,
+      status: restOfDoc.status, // Should be 'active'
       avatarUrl: restOfDoc.avatarUrl,
       specializedRegion: restOfDoc.specializedRegion,
     };
@@ -127,7 +130,11 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
     
+    // Ensure email, if provided, is lowercased for consistency
     const updatePayload: Partial<Omit<User, 'id' | 'password' | 'status'>> = { ...updatedData };
+    if (updatedData.email) {
+        updatePayload.email = updatedData.email.toLowerCase();
+    }
     if (updatedData.name && !updatedData.avatarUrl) { 
         updatePayload.avatarUrl = `https://placehold.co/100x100/E5EAF7/2962FF?text=${updatedData.name.substring(0,2).toUpperCase()}`;
     }
@@ -147,9 +154,8 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
       id: _id.toString(),
       name: restOfUser.name,
       email: restOfUser.email,
-      password: restOfUser.password, // This is the old password, not updated here
       role: restOfUser.role,
-      status: restOfUser.status || 'active',
+      status: restOfUser.status || 'active', // Ensure status is present
       avatarUrl: restOfUser.avatarUrl,
       specializedRegion: restOfUser.specializedRegion,
     };
@@ -205,10 +211,15 @@ export async function toggleEmployeeSuspensionAction(employeeId: string): Promis
       return null;
     }
     const { _id, ...restOfUser } = result;
+    // Ensure the returned User object has all necessary fields and correct types
     return { 
       id: _id.toString(), 
-      ...restOfUser, 
-      status: restOfUser.status // ensure status is correctly included
+      name: restOfUser.name,
+      email: restOfUser.email,
+      role: restOfUser.role,
+      status: restOfUser.status, // This is the newly updated status
+      avatarUrl: restOfUser.avatarUrl,
+      specializedRegion: restOfUser.specializedRegion,
     } as User;
   } catch (error) {
     console.error('Error toggling employee suspension:', error);
@@ -229,26 +240,30 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
     }
 
     if (userDoc.status === 'suspended') {
-      return null; // Account suspended
+      return null; // Account suspended, authentication fails
     }
 
-    if (userDoc.password === passwordAttempt) {
+    // IMPORTANT: Ensure password field exists on userDoc before comparing
+    if (userDoc.password && userDoc.password === passwordAttempt) {
       const { _id, ...restOfDoc } = userDoc;
+      // Construct User object for AuthContext, EXCLUDING password
       const user: User = {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
         role: restOfDoc.role,
-        status: restOfDoc.status,
+        status: restOfDoc.status || 'active', // Default to active if status somehow missing
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
       };
-      return user;
+      return user; // Authentication successful
     }
 
-    return null; // Password incorrect
+    return null; // Password incorrect or missing
   } catch (error) {
     console.error('Error during user authentication:', error);
+    // Do not expose detailed error messages to the client from here
     throw new Error('Authentication failed due to a server error.');
   }
 }
+
