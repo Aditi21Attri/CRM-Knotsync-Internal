@@ -36,15 +36,6 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
 
-  const handleForgotPassword = () => {
-    toast({
-      title: "Forgot Password",
-      description: "Password reset functionality is not fully implemented. Please contact an administrator for assistance.",
-      variant: "default",
-      duration: 5000,
-    });
-  };
-
   if (authIsLoading && !isSubmitting) { 
      return (
         <div className="flex items-center justify-center min-h-screen bg-background">
@@ -83,12 +74,12 @@ export default function LoginPage() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
                 <Button 
-                  type="button" // Important: type="button" to prevent form submission
+                  type="button"
                   variant="link" 
+                  asChild
                   className="px-0 text-xs h-auto text-primary hover:underline"
-                  onClick={handleForgotPassword}
                 >
-                  Forgot Password?
+                  <Link href="/forgot-password">Forgot Password?</Link>
                 </Button>
               </div>
               <Input 

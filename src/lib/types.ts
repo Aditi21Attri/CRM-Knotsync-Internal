@@ -1,3 +1,4 @@
+
 export type UserRole = 'admin' | 'employee';
 export type UserStatus = 'active' | 'suspended';
 
@@ -12,6 +13,8 @@ export interface User {
   specializedRegion?: string; // e.g., "USA", "Australia", "UK"
   // assignedCustomerIds: string[]; // This is an alternative data model.
   // Currently, customer assignment is handled by Customer.assignedTo (employee ID).
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
 }
 
 export type CustomerStatus = 'hot' | 'cold' | 'neutral';

@@ -5,7 +5,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import type { User, UserRole, UserStatus } from '@/lib/types';
 import { ObjectId } from 'mongodb';
 import { unassignCustomersByEmployeeId } from './customerActions';
-
+import crypto from 'crypto';
 
 export interface EmployeeData {
   name: string;
@@ -24,16 +24,17 @@ export async function getUsers(): Promise<User[]> {
     const usersFromDb = await usersCollection.find({}).toArray();
     
     return usersFromDb.map(userDoc => {
-      const { _id, ...restOfDoc } = userDoc;
+      const { _id, password, ...restOfDoc } = userDoc; // Exclude password
       const user: User = {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        // password: restOfDoc.password, // Do not include password in data returned to client like this
         role: restOfDoc.role,
         status: restOfDoc.status || 'active', 
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
+        resetPasswordToken: restOfDoc.resetPasswordToken,
+        resetPasswordExpires: restOfDoc.resetPasswordExpires,
       };
       return user;
     });
@@ -50,16 +51,17 @@ export async function getEmployees(): Promise<User[]> {
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
-       const { _id, ...restOfDoc } = empDoc;
+       const { _id, password, ...restOfDoc } = empDoc; // Exclude password
        const employee: User = {
         id: _id.toString(),
         name: restOfDoc.name,
         email: restOfDoc.email,
-        // password: restOfDoc.password, // Do not include password
         role: restOfDoc.role as 'employee', 
         status: restOfDoc.status || 'active',
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
+        resetPasswordToken: restOfDoc.resetPasswordToken,
+        resetPasswordExpires: restOfDoc.resetPasswordExpires,
       };
       return employee;
     });
@@ -153,6 +155,8 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
       status: restOfUser.status || 'active', 
       avatarUrl: restOfUser.avatarUrl,
       specializedRegion: restOfUser.specializedRegion,
+      resetPasswordToken: restOfUser.resetPasswordToken,
+      resetPasswordExpires: restOfUser.resetPasswordExpires,
     };
     return updatedUser;
 
@@ -213,6 +217,8 @@ export async function toggleEmployeeSuspensionAction(employeeId: string): Promis
       status: restOfUser.status, 
       avatarUrl: restOfUser.avatarUrl,
       specializedRegion: restOfUser.specializedRegion,
+      resetPasswordToken: restOfUser.resetPasswordToken,
+      resetPasswordExpires: restOfUser.resetPasswordExpires,
     } as User;
   } catch (error) {
     console.error('Error toggling employee suspension:', error);
@@ -251,6 +257,8 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
         status: restOfDoc.status || 'active', 
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
+        resetPasswordToken: restOfDoc.resetPasswordToken,
+        resetPasswordExpires: restOfDoc.resetPasswordExpires,
       };
       return user; 
     }
@@ -259,5 +267,88 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
   } catch (error) {
     console.error('Error during user authentication:', error);
     throw new Error('Authentication failed due to a server error.');
+  }
+}
+
+export async function requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const user = await usersCollection.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Do not reveal if the user exists or not for security reasons
+      return { success: true, message: "If your email is registered, you will receive a password reset link." };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { $set: { resetPasswordToken: resetToken, resetPasswordExpires: resetPasswordExpires } }
+    );
+
+    // Mock sending email. In a real app, you'd use an email service.
+    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/reset-password/${resetToken}`;
+    console.log(`Password Reset Link (for ${email}): ${resetUrl}`); // Log for prototype purposes
+
+    return { success: true, message: "If your email is registered, you will receive a password reset link. (Link logged to server console for prototype)" };
+  } catch (error) {
+    console.error('Error requesting password reset:', error);
+    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+    return { success: false, message: `Failed to request password reset: ${errorMessage}` };
+  }
+}
+
+export async function verifyTokenForPasswordReset(token: string): Promise<{ isValid: boolean; message?: string; email?: string }> {
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const user = await usersCollection.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return { isValid: false, message: "Password reset token is invalid or has expired." };
+    }
+
+    return { isValid: true, email: user.email };
+  } catch (error) {
+    console.error('Error verifying reset token:', error);
+    return { isValid: false, message: "An error occurred while verifying the token." };
+  }
+}
+
+export async function resetPassword(token: string, newPasswordValue: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    
+    // Find user by token and ensure token is not expired
+    const user = await usersCollection.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return { success: false, message: "Password reset token is invalid or has expired." };
+    }
+
+    // Update password and clear reset token fields
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { 
+        $set: { password: newPasswordValue }, // In a real app, hash the password here
+        $unset: { resetPasswordToken: "", resetPasswordExpires: "" } 
+      }
+    );
+
+    return { success: true, message: "Your password has been successfully reset. Please log in with your new password." };
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+    return { success: false, message: `Failed to reset password: ${errorMessage}` };
   }
 }
