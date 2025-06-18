@@ -2,14 +2,13 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole } from '@/lib/types';
+import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction } from '@/lib/actions/customerActions';
-import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData } from '@/lib/actions/userActions'; // Import EmployeeData
+import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData, deleteEmployeeAction, toggleEmployeeSuspensionAction } from '@/lib/actions/userActions';
 
-// Use EmployeeData for creation, ensuring password is required for new employees
 interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
-interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password'>> {}
+interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password' | 'status'>> {}
 
 
 interface DataContextType {
@@ -22,6 +21,8 @@ interface DataContextType {
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
   addEmployee: (employeeData: EmployeeCreationData) => Promise<void>;
   updateEmployee: (employeeId: string, updatedData: EmployeeUpdateData) => Promise<void>;
+  deleteEmployee: (employeeId: string) => Promise<void>;
+  toggleEmployeeSuspension: (employeeId: string) => Promise<void>;
   dataLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -66,7 +67,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const newCustomer = await addCustomerAction(customerData, assignedTo, status);
       setCustomers(prev => [newCustomer, ...prev]);
-      // Toast is handled in ExcelImportForm for more specific messaging
     } catch (error) {
       console.error("Failed to add customer:", error);
       toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" });
@@ -121,7 +121,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addEmployee = async (employeeData: EmployeeCreationData) => {
     try {
-      // Ensure password is provided, which EmployeeCreationData type now enforces
       const newEmployee = await addEmployeeAction(employeeData); 
       setUsers(prev => [newEmployee, ...prev]);
       if (newEmployee.role === 'employee') {
@@ -145,7 +144,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           if (isCurrentlyEmployee) {
             setEmployees(prevEmps => prevEmps.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
           } else {
-            // If role changed to employee
             setEmployees(prevEmps => [...prevEmps.filter(emp => emp.id !== updatedEmployee.id), updatedEmployee]);
           }
         } else { 
@@ -161,6 +159,42 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteEmployee = async (employeeId: string) => {
+    try {
+      const result = await deleteEmployeeAction(employeeId);
+      if (result.success) {
+        setUsers(prev => prev.filter(u => u.id !== employeeId));
+        setEmployees(prev => prev.filter(e => e.id !== employeeId));
+        // Refresh customers to reflect unassignments
+        const fetchedCustomers = await getCustomers();
+        setCustomers(fetchedCustomers);
+        toast({ title: "Employee Deleted", description: `Employee has been deleted.` });
+      } else {
+        throw new Error(result.message || "Failed to delete employee.");
+      }
+    } catch (error) {
+      console.error("Failed to delete employee:", error);
+      toast({ title: "Error", description: `Failed to delete employee: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+
+  const toggleEmployeeSuspension = async (employeeId: string) => {
+    try {
+      const updatedEmployee = await toggleEmployeeSuspensionAction(employeeId);
+      if (updatedEmployee) {
+        const newStatus = updatedEmployee.status === 'active' ? 'activated' : 'suspended';
+        setUsers(prev => prev.map(u => u.id === updatedEmployee.id ? updatedEmployee : u));
+        setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
+        toast({ title: `Employee ${newStatus}`, description: `${updatedEmployee.name}'s account has been ${newStatus}.` });
+      } else {
+        throw new Error("Employee not found or status update failed.");
+      }
+    } catch (error) {
+      console.error("Failed to toggle employee suspension:", error);
+      toast({ title: "Error", description: `Failed to toggle suspension: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+
   return (
     <DataContext.Provider value={{ 
       customers, 
@@ -172,6 +206,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateCustomerStatus, 
       addEmployee,
       updateEmployee,
+      deleteEmployee,
+      toggleEmployeeSuspension,
       dataLoading,
       refreshData: fetchData,
     }}>

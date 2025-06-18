@@ -159,3 +159,21 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
     throw new Error(`Failed to update customer status. Details: ${errorMessage}`);
   }
 }
+
+// New action to unassign customers from a given employee
+export async function unassignCustomersByEmployeeId(employeeId: string): Promise<{ success: boolean; modifiedCount: number }> {
+  try {
+    const db = await connectToDatabase();
+    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    
+    const result = await customersCollection.updateMany(
+      { assignedTo: employeeId },
+      { $set: { assignedTo: null, lastContacted: new Date().toISOString() } }
+    );
+    
+    return { success: true, modifiedCount: result.modifiedCount };
+  } catch (error) {
+    console.error(`Failed to unassign customers from employee ${employeeId}:`, error);
+    throw new Error(`Failed to unassign customers. Details: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

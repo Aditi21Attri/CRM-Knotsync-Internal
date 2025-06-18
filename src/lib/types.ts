@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'employee';
+export type UserStatus = 'active' | 'suspended';
 
 export interface User {
   id: string;
@@ -6,6 +7,7 @@ export interface User {
   email: string;
   password?: string; // Stored for mock authentication. In real app, use passwordHash.
   role: UserRole;
+  status?: UserStatus; // Optional for existing users, will default to 'active'
   avatarUrl?: string;
   specializedRegion?: string; // e.g., "USA", "Australia", "UK"
   // assignedCustomerIds: string[]; // This is an alternative data model.

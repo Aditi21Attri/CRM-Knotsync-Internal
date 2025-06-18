@@ -2,13 +2,16 @@
 'use server';
 
 import { connectToDatabase } from '@/lib/mongodb';
-import type { User, UserRole } from '@/lib/types';
+import type { User, UserRole, UserStatus } from '@/lib/types';
 import { ObjectId } from 'mongodb';
+import { unassignCustomersByEmployeeId } from './customerActions';
+
 
 export interface EmployeeData {
   name: string;
   email: string;
   role: UserRole;
+  status?: UserStatus;
   avatarUrl?: string;
   password?: string; 
   specializedRegion?: string;
@@ -28,6 +31,7 @@ export async function getUsers(): Promise<User[]> {
         email: restOfDoc.email,
         password: restOfDoc.password,
         role: restOfDoc.role,
+        status: restOfDoc.status || 'active',
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
       };
@@ -43,7 +47,6 @@ export async function getEmployees(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
-    // Fetch all users and then filter for employees client-side or ensure role is strictly 'employee' in DB query if preferred
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
@@ -54,6 +57,7 @@ export async function getEmployees(): Promise<User[]> {
         email: restOfDoc.email,
         password: restOfDoc.password,
         role: restOfDoc.role,
+        status: restOfDoc.status || 'active',
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
       };
@@ -81,6 +85,7 @@ export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData
       email: employeeData.email,
       password: employeeData.password,
       role: employeeData.role,
+      status: 'active', // Default status
       avatarUrl: employeeData.avatarUrl || `https://placehold.co/100x100/E5EAF7/2962FF?text=${employeeData.name.substring(0,2).toUpperCase()}`,
       specializedRegion: employeeData.specializedRegion || undefined,
     };
@@ -104,6 +109,7 @@ export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData
       email: restOfDoc.email,
       password: restOfDoc.password,
       role: restOfDoc.role,
+      status: restOfDoc.status,
       avatarUrl: restOfDoc.avatarUrl,
       specializedRegion: restOfDoc.specializedRegion,
     };
@@ -116,12 +122,12 @@ export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData
   }
 }
 
-export async function updateEmployeeAction(employeeId: string, updatedData: Partial<Omit<EmployeeData, 'password'>>): Promise<User | null> {
+export async function updateEmployeeAction(employeeId: string, updatedData: Partial<Omit<EmployeeData, 'password' | 'status'>>): Promise<User | null> {
   try {
     const db = await connectToDatabase();
     const usersCollection = db.collection<Omit<User, 'id'>>('users');
     
-    const updatePayload: Partial<Omit<User, 'id' | 'password'>> = { ...updatedData };
+    const updatePayload: Partial<Omit<User, 'id' | 'password' | 'status'>> = { ...updatedData };
     if (updatedData.name && !updatedData.avatarUrl) { 
         updatePayload.avatarUrl = `https://placehold.co/100x100/E5EAF7/2962FF?text=${updatedData.name.substring(0,2).toUpperCase()}`;
     }
@@ -141,8 +147,9 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
       id: _id.toString(),
       name: restOfUser.name,
       email: restOfUser.email,
-      password: restOfUser.password,
+      password: restOfUser.password, // This is the old password, not updated here
       role: restOfUser.role,
+      status: restOfUser.status || 'active',
       avatarUrl: restOfUser.avatarUrl,
       specializedRegion: restOfUser.specializedRegion,
     };
@@ -155,6 +162,61 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
   }
 }
 
+export async function deleteEmployeeAction(employeeId: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    
+    // Before deleting, unassign customers from this employee
+    await unassignCustomersByEmployeeId(employeeId);
+
+    const result = await usersCollection.deleteOne({ _id: new ObjectId(employeeId) });
+
+    if (result.deletedCount === 0) {
+      return { success: false, message: 'Employee not found.' };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, message: `Failed to delete employee: ${errorMessage}` };
+  }
+}
+
+export async function toggleEmployeeSuspensionAction(employeeId: string): Promise<User | null> {
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+
+    const employee = await usersCollection.findOne({ _id: new ObjectId(employeeId) });
+    if (!employee) {
+      return null;
+    }
+
+    const newStatus: UserStatus = employee.status === 'active' ? 'suspended' : 'active';
+
+    const result = await usersCollection.findOneAndUpdate(
+      { _id: new ObjectId(employeeId) },
+      { $set: { status: newStatus } },
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return null;
+    }
+    const { _id, ...restOfUser } = result;
+    return { 
+      id: _id.toString(), 
+      ...restOfUser, 
+      status: restOfUser.status // ensure status is correctly included
+    } as User;
+  } catch (error) {
+    console.error('Error toggling employee suspension:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to toggle employee suspension: ${errorMessage}`);
+  }
+}
+
 export async function authenticateUser(email: string, passwordAttempt: string): Promise<User | null> {
   try {
     const db = await connectToDatabase();
@@ -163,7 +225,11 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
     const userDoc = await usersCollection.findOne({ email: email.toLowerCase() });
 
     if (!userDoc) {
-      return null; 
+      return null; // User not found
+    }
+
+    if (userDoc.status === 'suspended') {
+      return null; // Account suspended
     }
 
     if (userDoc.password === passwordAttempt) {
@@ -173,13 +239,14 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
         name: restOfDoc.name,
         email: restOfDoc.email,
         role: restOfDoc.role,
+        status: restOfDoc.status,
         avatarUrl: restOfDoc.avatarUrl,
         specializedRegion: restOfDoc.specializedRegion,
       };
       return user;
     }
 
-    return null; 
+    return null; // Password incorrect
   } catch (error) {
     console.error('Error during user authentication:', error);
     throw new Error('Authentication failed due to a server error.');

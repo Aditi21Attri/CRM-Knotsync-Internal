@@ -5,7 +5,7 @@ import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { authenticateUser } from '@/lib/actions/userActions'; // Import the new action
+import { authenticateUser } from '@/lib/actions/userActions'; 
 
 interface AuthContextType {
   currentUser: User | null;
@@ -28,32 +28,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('currentUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
-        // We re-authenticate or re-validate if necessary, or trust localStorage for session persistence in prototype
-        // For simplicity, if a user is in localStorage, we set them.
-        // A real app would re-validate the session token with the backend.
-        setCurrentUser(parsedUser);
+        // Re-validate session by checking status, but not re-authenticating password from localStorage
+        if (parsedUser && parsedUser.status === 'active') {
+            setCurrentUser(parsedUser);
+        } else if (parsedUser && parsedUser.status === 'suspended') {
+            localStorage.removeItem('currentUser'); // Clear suspended user from storage
+             toast({
+                title: 'Account Suspended',
+                description: 'Your account is currently suspended. Please contact an administrator.',
+                variant: 'destructive',
+            });
+        } else {
+             localStorage.removeItem('currentUser');
+        }
       }
     } catch (error) {
       console.error("Failed to parse stored user:", error);
       localStorage.removeItem('currentUser');
     }
     setIsLoading(false);
-  }, []);
+  }, [toast]); // Added toast to dependency array
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const user = await authenticateUser(email, password);
 
-      if (user) {
+      if (user && user.status === 'active') {
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
         router.push('/dashboard');
         toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
+      } else if (user && user.status === 'suspended') {
+         toast({
+          title: 'Account Suspended',
+          description: 'Your account is currently suspended. Please contact an administrator.',
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Login Failed',
-          description: 'Invalid email or password. Please try again.',
+          description: 'Invalid email or password, or account may be inactive. Please try again.',
           variant: 'destructive',
         });
       }
