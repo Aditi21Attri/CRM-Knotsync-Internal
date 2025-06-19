@@ -67,7 +67,6 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
     // We pass the whole 'data' object which includes values from dynamically rendered inputs
     await updateCustomer(customer.id, data as Partial<Customer>);
     setIsSubmitting(false);
-    // form.reset(); // Might not be needed if dialog closes
     onFormSubmit(); // Close dialog
   }
 
@@ -119,7 +118,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
               <FormItem>
                 <FormLabel>Phone Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. 555-123-4567" {...field} />
+                  <Input placeholder="e.g. 555-123-4567" {...field} value={field.value ?? ''}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -132,7 +131,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
               <FormItem>
                 <FormLabel>Category/Region</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. USA, Tech, Enterprise" {...field} />
+                  <Input placeholder="e.g. USA, Tech, Enterprise" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -151,7 +150,12 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                     <FormItem className="mb-4">
                       <FormLabel>{formatLabel(key)}</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ''} />
+                        <Input 
+                          {...field} 
+                          // Ensure value is a string for the input.
+                          // Handles null, undefined, or other types by converting to string or empty string.
+                          value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -175,4 +179,3 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
     </Form>
   );
 }
-
