@@ -5,13 +5,14 @@ import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { authenticateUser } from '@/lib/actions/userActions'; 
+import { authenticateUser, createInitialAdminAction } from '@/lib/actions/userActions'; 
 
 interface AuthContextType {
   currentUser: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  createInitialAdmin: (name: string, email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,11 +29,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('currentUser');
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
-        // Re-validate session by checking status, but not re-authenticating password from localStorage
         if (parsedUser && parsedUser.status === 'active') {
             setCurrentUser(parsedUser);
         } else if (parsedUser && parsedUser.status === 'suspended') {
-            localStorage.removeItem('currentUser'); // Clear suspended user from storage
+            localStorage.removeItem('currentUser'); 
              toast({
                 title: 'Account Suspended',
                 description: 'Your account is currently suspended. Please contact an administrator.',
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('currentUser');
     }
     setIsLoading(false);
-  }, [toast]); // Added toast to dependency array
+  }, [toast]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -60,17 +60,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         router.push('/dashboard');
         toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
       } else if (user && user.status === 'suspended') {
-        // This case might be redundant if authenticateUser already returns null for suspended users.
-        // However, it's a safeguard if authenticateUser's logic changes.
          toast({
           title: 'Account Suspended',
           description: 'Your account is currently suspended. Please contact an administrator.',
           variant: 'destructive',
         });
       } else {
-        // This handles:
-        // 1. authenticateUser returned null (user not found, password incorrect, or user was suspended in DB)
-        // 2. authenticateUser returned a user, but status is not 'active' (should be rare if authenticateUser is correct)
         toast({
           title: 'Login Failed',
           description: 'Invalid email or password, or account may be inactive/suspended. Please try again.',
@@ -96,8 +91,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
 
+  const createInitialAdmin = async (name: string, email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const result = await createInitialAdminAction({ name, email, password });
+      if (result.success && result.user) {
+        toast({
+          title: "Admin Account Created",
+          description: `Admin ${result.user.name} created. Please log in.`,
+        });
+        // router.push('/login'); // Or automatically log them in
+      } else {
+        toast({
+          title: "Admin Creation Failed",
+          description: result.message || "Could not create admin account.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Create admin error:", error);
+      toast({
+        title: 'Creation Error',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ currentUser, login, logout, isLoading, createInitialAdmin }}>
       {children}
     </AuthContext.Provider>
   );
@@ -110,4 +135,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

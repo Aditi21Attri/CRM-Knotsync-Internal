@@ -17,6 +17,13 @@ export interface EmployeeData {
   specializedRegion?: string;
 }
 
+interface CreateInitialAdminArgs {
+  name: string;
+  email: string;
+  password?: string; // Password is required for creation
+}
+
+
 export async function getUsers(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
@@ -259,25 +266,10 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
         };
         return user; 
       }
-    } else {
-      // Fallback for super@admin.com if not found in DB - FOR PROTOTYPING ONLY
-      if (email.toLowerCase() === 'super@admin.com' && passwordAttempt === '123admin') {
-        console.warn("Authenticated super@admin.com via hardcoded fallback. This user should ideally be added to the database via the UI.");
-        return {
-          id: 'superadmin-fallback-001', // Unique ID for the fallback user
-          name: 'Super Admin (Fallback)',
-          email: 'super@admin.com',
-          role: 'admin',
-          status: 'active',
-          avatarUrl: `https://placehold.co/100x100/2962FF/E5EAF7?text=SA`, // Placeholder avatar
-        };
-      }
     }
-
     return null; 
   } catch (error) {
     console.error('Error during user authentication:', error);
-    // Check for SSL-related errors specifically
     if (error instanceof Error && error.message.includes('SSL routines')) {
          console.error('An SSL/TLS error occurred during authentication. Check MONGODB_URI and server SSL configuration.');
          throw new Error('Authentication failed due to a network security issue. Please contact support.');
@@ -362,5 +354,64 @@ export async function resetPassword(token: string, newPasswordValue: string): Pr
     console.error('Error resetting password:', error);
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
     return { success: false, message: `Failed to reset password: ${errorMessage}` };
+  }
+}
+
+export async function createInitialAdminAction(
+  { name, email, password: adminPassword }: CreateInitialAdminArgs
+): Promise<{ success: boolean; user?: User; message?: string }> {
+  if (!adminPassword) {
+    return { success: false, message: "Password is required to create an admin." };
+  }
+  try {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+
+    // Check if any admin user already exists
+    const existingAdmin = await usersCollection.findOne({ role: 'admin' });
+    if (existingAdmin) {
+      return { success: false, message: 'An admin account already exists. Initial admin can only be created once.' };
+    }
+
+    const lowercasedEmail = email.toLowerCase();
+    const userWithSameEmail = await usersCollection.findOne({ email: lowercasedEmail });
+    if (userWithSameEmail) {
+      return { success: false, message: 'An account with this email already exists.' };
+    }
+
+    const newAdminDbData: Omit<User, 'id'> = {
+      name,
+      email: lowercasedEmail,
+      password: adminPassword, // Store the plain password (for prototype)
+      role: 'admin',
+      status: 'active',
+      avatarUrl: `https://placehold.co/100x100/2962FF/E5EAF7?text=${name.substring(0, 2).toUpperCase()}`,
+    };
+
+    const result = await usersCollection.insertOne(newAdminDbData);
+    if (!result.insertedId) {
+      throw new Error('MongoDB insertOne operation failed to return an insertedId for initial admin.');
+    }
+
+    const insertedDoc = await usersCollection.findOne({ _id: result.insertedId });
+    if (!insertedDoc) {
+      throw new Error('Failed to retrieve the newly created admin from the database.');
+    }
+    
+    const { _id, password, ...restOfDoc } = insertedDoc; // Exclude password from returned object
+    const finalUser: User = {
+      id: _id.toString(),
+      name: restOfDoc.name,
+      email: restOfDoc.email,
+      role: restOfDoc.role,
+      status: restOfDoc.status,
+      avatarUrl: restOfDoc.avatarUrl,
+    };
+
+    return { success: true, user: finalUser, message: 'Initial admin account created successfully.' };
+  } catch (error) {
+    console.error('Error creating initial admin:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    return { success: false, message: `Failed to create initial admin: ${errorMessage}` };
   }
 }
