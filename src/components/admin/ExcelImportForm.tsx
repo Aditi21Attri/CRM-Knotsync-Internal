@@ -15,6 +15,7 @@ import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
 
 const customerFields: (keyof MappedCustomerData)[] = ["name", "email", "phoneNumber", "category"];
+const NONE_VALUE = "__NONE__"; // Special value for "Not Mapped"
 
 interface CustomFieldMap {
   id: string;
@@ -94,6 +95,8 @@ export function ExcelImportForm() {
             const matchedHeader = results.meta.fields?.find(h => h.toLowerCase() === field.toLowerCase() || h.toLowerCase().replace(/\s/g, '') === field.toLowerCase());
             if (matchedHeader) {
                 initialMapping[field] = matchedHeader;
+            } else {
+                initialMapping[field] = ''; // Default to unmapped
             }
         });
         setColumnMapping(initialMapping);
@@ -110,7 +113,7 @@ export function ExcelImportForm() {
   };
   
   const handleMappingChange = (customerField: keyof MappedCustomerData, csvHeader: string) => {
-    setColumnMapping(prev => ({ ...prev, [customerField]: csvHeader }));
+    setColumnMapping(prev => ({ ...prev, [customerField]: csvHeader === NONE_VALUE ? '' : csvHeader }));
   };
 
   const addCustomFieldMap = () => {
@@ -118,7 +121,8 @@ export function ExcelImportForm() {
   };
 
   const updateCustomFieldMap = (index: number, field: 'crmFieldName' | 'csvColumnName', value: string) => {
-    setCustomFieldMappings(prev => prev.map((map, i) => i === index ? { ...map, [field]: value } : map));
+    const actualValue = field === 'csvColumnName' && value === NONE_VALUE ? '' : value;
+    setCustomFieldMappings(prev => prev.map((map, i) => i === index ? { ...map, [field]: actualValue } : map));
   };
 
   const removeCustomFieldMap = (id: string) => {
@@ -132,7 +136,7 @@ export function ExcelImportForm() {
         setError("Please map at least 'Name' and 'Email' customer fields before proceeding.");
         return;
     }
-    // Validate custom field mappings: CRM Field Name must be unique and not empty if CSV Column is selected
+    
     for (const mapping of customFieldMappings) {
         if (mapping.csvColumnName && !mapping.crmFieldName.trim()) {
             setError(`Please provide a 'CRM Field Name' for the custom mapping with CSV column '${mapping.csvColumnName}'.`);
@@ -142,7 +146,8 @@ export function ExcelImportForm() {
             setError(`Please select a 'CSV Column' for the custom CRM field '${mapping.crmFieldName}'.`);
             return;
         }
-        if (customerFields.includes(mapping.crmFieldName.trim().toLowerCase() as any) || Object.keys(columnMapping).includes(mapping.crmFieldName.trim().toLowerCase())) {
+        const crmFieldNameLower = mapping.crmFieldName.trim().toLowerCase();
+        if (customerFields.includes(crmFieldNameLower as any) || Object.keys(columnMapping).some(key => key.toLowerCase() === crmFieldNameLower)) {
             setError(`Custom CRM Field Name '${mapping.crmFieldName}' conflicts with a standard field name. Please use a unique name.`);
             return;
         }
@@ -225,8 +230,8 @@ export function ExcelImportForm() {
         const csvHeader = columnMapping[field];
         if (csvHeader && row[csvHeader] !== undefined && row[csvHeader] !== null) {
           customerData[field] = String(row[csvHeader]);
-        } else if (field === "name" || field === "email") { 
-            if(csvHeader) validRow = false; 
+        } else if (!csvHeader && (field === "name" || field === "email")) {
+            validRow = false; 
         }
       });
 
@@ -345,14 +350,14 @@ export function ExcelImportForm() {
                         <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{formatPreviewKey(field)}{field === 'category' ? ' (for Region)' : ''}{field === 'name' || field === 'email' ? ' (Required)' : ''}</Label>
                         <Select
                             onValueChange={(value) => handleMappingChange(field, value)}
-                            value={columnMapping[field] || ""}
+                            value={columnMapping[field] || NONE_VALUE}
                             required={field === "name" || field === "email"}
                         >
                             <SelectTrigger id={`map-${field}`} className="w-full text-base">
                             <SelectValue placeholder="Select CSV Column" />
                             </SelectTrigger>
                             <SelectContent>
-                            <SelectItem value="">-- Not Mapped --</SelectItem>
+                            <SelectItem value={NONE_VALUE}>-- Not Mapped --</SelectItem>
                             {headers.map(header => (
                                 <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
                             ))}
@@ -389,15 +394,18 @@ export function ExcelImportForm() {
                         <div className="flex-1 w-full md:w-auto">
                              <Label htmlFor={`custom-csv-${mapping.id}`} className="text-sm font-medium">CSV Column</Label>
                             <Select
-                                value={mapping.csvColumnName}
+                                value={mapping.csvColumnName || NONE_VALUE}
                                 onValueChange={(value) => updateCustomFieldMap(index, 'csvColumnName', value)}
                             >
                                 <SelectTrigger id={`custom-csv-${mapping.id}`} className="w-full mt-1 text-base">
                                     <SelectValue placeholder="Select CSV Column" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">-- Not Mapped --</SelectItem>
-                                    {headers.filter(h => !Object.values(columnMapping).includes(h) && !customFieldMappings.some((cfm, cfmIndex) => cfmIndex !== index && cfm.csvColumnName === h)).map(header => (
+                                    <SelectItem value={NONE_VALUE}>-- Not Mapped --</SelectItem>
+                                    {headers.filter(h => 
+                                        !Object.values(columnMapping).includes(h) && 
+                                        !customFieldMappings.some((cfm, cfmIndex) => cfmIndex !== index && cfm.csvColumnName === h)
+                                    ).map(header => (
                                         <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -507,3 +515,5 @@ export function ExcelImportForm() {
     </Card>
   );
 }
+
+    
