@@ -16,12 +16,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, PlusCircle } from "lucide-react";
+import { CustomerManualAddForm } from "@/components/shared/CustomerManualAddForm";
 
 export default function AllCustomersPage() {
   const { deleteAllCustomers, customers } = useData();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const handleDeleteAll = async () => {
     await deleteAllCustomers();
@@ -34,35 +37,48 @@ export default function AllCustomersPage() {
         title="All Customers"
         description="View, manage, and assign all customers in the system."
         actions={
-          customers.length > 0 ? (
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive">
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete All Customers
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center">
-                    <AlertTriangle className="mr-2 h-6 w-6 text-destructive" />
-                    Confirm Deletion
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you absolutely sure you want to delete ALL customers? This action will permanently remove all customer data from the system and cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDeleteAll}
-                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                  >
-                    Yes, Delete All Customers
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : null
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[525px] p-0">
+                {isAddModalOpen && <CustomerManualAddForm onFormSubmit={() => setIsAddModalOpen(false)} />}
+              </DialogContent>
+            </Dialog>
+
+            {customers.length > 0 && (
+              <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete All Customers
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center">
+                      <AlertTriangle className="mr-2 h-6 w-6 text-destructive" />
+                      Confirm Deletion
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you absolutely sure you want to delete ALL customers? This action will permanently remove all customer data from the system and cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAll}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                    >
+                      Yes, Delete All Customers
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         }
       />
       <CustomerTableAdmin />

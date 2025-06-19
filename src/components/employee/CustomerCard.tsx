@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3 } from "lucide-react";
+import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3, Clock } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { CustomerEditForm } from '@/components/shared/CustomerEditForm';
 
 const statusColors: Record<CustomerStatus, string> = {
@@ -55,6 +55,17 @@ export function CustomerCard({ customer }: CustomerCardProps) {
   }
   
   const lastContactedDate = customer.lastContacted ? parseISO(customer.lastContacted) : null;
+  const createdAtDate = customer.createdAt ? parseISO(customer.createdAt) : null;
+
+  const formatDate = (date: Date | null, includeTime = false) => {
+    if (!date) return 'N/A';
+    return includeTime ? format(date, 'MMM d, yyyy h:mm a') : format(date, 'MMM d, yyyy');
+  };
+
+  const formatRelativeDate = (date: Date | null) => {
+     if (!date) return 'N/A';
+     return formatDistanceToNow(date, { addSuffix: true });
+  }
 
   return (
     <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
@@ -95,10 +106,14 @@ export function CustomerCard({ customer }: CustomerCardProps) {
           <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
           <span>{customer.phoneNumber}</span>
         </div>
+         <div className="flex items-center text-xs text-muted-foreground">
+            <CalendarDays className="h-3 w-3 mr-1.5" />
+            Added: {formatDate(createdAtDate)}
+        </div>
         {lastContactedDate && (
              <div className="flex items-center text-xs text-muted-foreground">
-                <CalendarDays className="h-3 w-3 mr-1.5" />
-                Last contacted: {formatDistanceToNow(lastContactedDate, { addSuffix: true })}
+                <Clock className="h-3 w-3 mr-1.5" />
+                Last activity: {formatRelativeDate(lastContactedDate)}
             </div>
         )}
         {customer.notes && !isEditingNote && (

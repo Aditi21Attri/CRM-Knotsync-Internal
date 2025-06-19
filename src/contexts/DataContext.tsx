@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction, deleteAllCustomersAction } from '@/lib/actions/customerActions';
+import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction, deleteAllCustomersAction, handleManualAddCustomerAction, type ManualAddCustomerFormData } from '@/lib/actions/customerActions';
 import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData, deleteEmployeeAction, toggleEmployeeSuspensionAction } from '@/lib/actions/userActions';
 
 interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
@@ -16,6 +16,7 @@ interface DataContextType {
   users: User[]; 
   employees: User[]; 
   addCustomer: (customerData: MappedCustomerData, assignedTo?: string | null, status?: CustomerStatus) => Promise<void>;
+  manualAddCustomer: (formData: ManualAddCustomerFormData, currentUserId: string, currentUserRole: UserRole) => Promise<{ success: boolean; customer?: Customer }>;
   updateCustomer: (customerId: string, updatedData: Partial<Customer>) => Promise<void>;
   assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
@@ -67,12 +68,35 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const addCustomer = async (customerData: MappedCustomerData, assignedTo: string | null = null, status: CustomerStatus = 'neutral') => {
     try {
       const newCustomer = await addCustomerAction(customerData, assignedTo, status);
-      setCustomers(prev => [newCustomer, ...prev]);
+      setCustomers(prev => [newCustomer, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
-      console.error("Failed to add customer:", error);
-      toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" });
+      console.error("Failed to add customer (CSV):", error);
+      toast({ title: "Error", description: "Failed to add customer from CSV.", variant: "destructive" });
     }
   };
+
+  const manualAddCustomer = async (formData: ManualAddCustomerFormData, currentUserId: string, currentUserRole: UserRole): Promise<{ success: boolean; customer?: Customer }> => {
+    try {
+      const result = await handleManualAddCustomerAction(formData, currentUserId, currentUserRole);
+      if (result.status === 'created' && result.customer) {
+        setCustomers(prev => [result.customer!, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        toast({ title: "Customer Added", description: `${result.customer.name} has been successfully added.` });
+        return { success: true, customer: result.customer };
+      } else if (result.status === 'duplicate_updated' && result.customer) {
+        setCustomers(prev => prev.map(c => c.id === result.customer!.id ? result.customer! : c).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        toast({ title: "Customer Exists", description: `A customer with this email or phone already exists. ${result.customer.name}'s contact time has been updated.` });
+        return { success: true, customer: result.customer };
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to add customer.", variant: "destructive" });
+        return { success: false };
+      }
+    } catch (error) {
+      console.error("Failed to manually add customer:", error);
+      toast({ title: "Error", description: "An unexpected error occurred while adding the customer.", variant: "destructive" });
+      return { success: false };
+    }
+  };
+
 
   const updateCustomer = async (customerId: string, updatedData: Partial<Customer>) => {
     try {
@@ -124,7 +148,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const result = await deleteAllCustomersAction();
       if (result.success) {
-        setCustomers([]); // Clear local state
+        setCustomers([]); 
         toast({
           title: "All Customers Deleted",
           description: `${result.deletedCount} customer(s) have been removed from the system.`,
@@ -188,7 +212,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (result.success) {
         setUsers(prev => prev.filter(u => u.id !== employeeId));
         setEmployees(prev => prev.filter(e => e.id !== employeeId));
-        // Refresh customers to reflect unassignments
         const fetchedCustomers = await getCustomers();
         setCustomers(fetchedCustomers);
         toast({ title: "Employee Deleted", description: `Employee has been deleted.` });
@@ -224,6 +247,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       users, 
       employees, 
       addCustomer, 
+      manualAddCustomer,
       updateCustomer,
       assignCustomer, 
       updateCustomerStatus, 

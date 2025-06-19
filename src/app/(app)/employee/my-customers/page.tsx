@@ -8,16 +8,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import type { CustomerStatus } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, ListFilter, UserCheck, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Users, PlusCircle } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { CustomerManualAddForm } from "@/components/shared/CustomerManualAddForm";
 
 export default function MyCustomersPage() {
   const { currentUser } = useAuth();
   const { customers, dataLoading } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<CustomerStatus | "all">("all");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const myCustomers = useMemo(() => {
     if (!currentUser) return [];
@@ -52,6 +55,18 @@ export default function MyCustomersPage() {
       <PageHeader
         title="My Assigned Customers"
         description="View and manage customers assigned to you."
+        actions={
+            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[525px] p-0">
+                {isAddModalOpen && <CustomerManualAddForm onFormSubmit={() => setIsAddModalOpen(false)} />}
+              </DialogContent>
+            </Dialog>
+        }
       />
 
       <div className="sticky top-[calc(theme(spacing.16)_-_1px)]  md:top-[calc(theme(spacing.16)_-_1px)] z-40 bg-background/80 backdrop-blur-md py-4 -mt-2 -mx-4 md:-mx-6 px-4 md:px-6 rounded-b-lg shadow-sm">

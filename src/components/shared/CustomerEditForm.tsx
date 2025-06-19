@@ -17,8 +17,9 @@ import { Input } from "@/components/ui/input";
 import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import type { Customer } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, CalendarClock } from "lucide-react";
 import { useState, useMemo } from "react";
+import { format, parseISO } from 'date-fns';
 
 const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -36,7 +37,7 @@ interface CustomerEditFormProps {
   onFormSubmit: () => void;
 }
 
-const STANDARD_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted'];
+const STANDARD_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted', 'createdAt'];
 
 export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormProps) {
   const { updateCustomer } = useData();
@@ -59,13 +60,24 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
 
   async function onSubmit(data: CustomerEditFormValues) {
     setIsSubmitting(true);
-    await updateCustomer(customer.id, data as Partial<Customer>);
+    // Exclude createdAt from the update payload as it should be immutable
+    const { createdAt, ...updateData } = data;
+    await updateCustomer(customer.id, updateData as Partial<Customer>);
     setIsSubmitting(false);
     onFormSubmit(); 
   }
 
   const formatLabel = (key: string) => {
     return key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(parseISO(dateString), 'MMM d, yyyy, h:mm a');
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   return (
@@ -78,7 +90,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 px-6 max-h-[calc(100vh-22rem)] overflow-y-auto pb-2">
+        <div className="space-y-4 px-6 max-h-[calc(100vh-24rem)] overflow-y-auto pb-2">
           <FormField
             control={form.control}
             name="name"
@@ -156,6 +168,16 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
               ))}
             </div>
           )}
+           <div className="pt-4 space-y-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+                <CalendarClock className="h-3.5 w-3.5" />
+                <span>Created: {formatDate(customer.createdAt)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <CalendarClock className="h-3.5 w-3.5" />
+                <span>Last Contacted: {formatDate(customer.lastContacted)}</span>
+            </div>
+          </div>
         </div>
         
         <DialogFooter className="px-6 pb-6 pt-4 border-t">

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { Customer, User, CustomerStatus } from "@/lib/types";
-import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag } from "lucide-react";
+import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag, CalendarDays } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -32,6 +32,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CustomerEditForm } from "@/components/shared/CustomerEditForm";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
+import { format, parseISO } from 'date-fns';
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-500 hover:bg-green-600",
@@ -40,7 +41,7 @@ const statusColors: Record<CustomerStatus, string> = {
 };
 
 const ITEMS_PER_PAGE = 10;
-const STANDARD_CUSTOMER_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted'];
+const STANDARD_CUSTOMER_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted', 'createdAt'];
 
 
 export function CustomerTableAdmin() {
@@ -49,7 +50,7 @@ export function CustomerTableAdmin() {
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all">("all");
   const [assignedFilter, setAssignedFilter] = useState<string | "all" | "unassigned">("all");
   const [categoryFilter, setCategoryFilter] = useState<string | "all">("all");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | string | null; direction: 'ascending' | 'descending' }>({ key: 'lastContacted', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | string | null; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
   const [currentPage, setCurrentPage] = useState(1);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -90,7 +91,18 @@ export function CustomerTableAdmin() {
     if (key === 'phoneNumber') return 'Phone';
     if (key === 'category') return 'Category';
     if (key === 'status') return 'Status';
+    if (key === 'createdAt') return 'Created At';
+    if (key === 'lastContacted') return 'Last Contacted';
     return key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(parseISO(dateString), 'MMM d, yyyy h:mm a');
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
 
@@ -127,18 +139,17 @@ export function CustomerTableAdmin() {
         if (valA === null || valA === undefined) return sortConfig.direction === 'ascending' ? 1 : -1; 
         if (valB === null || valB === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
         
+        if (sortConfig.key === 'createdAt' || sortConfig.key === 'lastContacted') {
+            const dateA = new Date(valA as string).getTime();
+            const dateB = new Date(valB as string).getTime();
+            return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
+        }
         if (typeof valA === 'string' && typeof valB === 'string') {
             return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
         if (typeof valA === 'number' && typeof valB === 'number') {
             return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
         }
-         if (sortConfig.key === 'lastContacted') {
-            const dateA = new Date(valA as string).getTime();
-            const dateB = new Date(valB as string).getTime();
-            return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
-        }
-
 
         if (valA < valB) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -296,6 +307,8 @@ export function CustomerTableAdmin() {
               <SortableHead columnKey="category" label="Category" />
               <SortableHead columnKey="status" label="Status" />
               <TableHead>Assigned To</TableHead>
+              <SortableHead columnKey="createdAt" label="Created At" />
+              <SortableHead columnKey="lastContacted" label="Last Contacted" />
               {allCustomFieldKeys.map(key => (
                   <TableHead key={key} className="whitespace-nowrap">{formatHeaderLabel(key)}</TableHead>
               ))}
@@ -358,6 +371,8 @@ export function CustomerTableAdmin() {
                     </SelectContent>
                   </Select>
                 </TableCell>
+                <TableCell className="whitespace-nowrap">{formatDate(customer.createdAt)}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDate(customer.lastContacted)}</TableCell>
                 {allCustomFieldKeys.map(key => (
                   <TableCell key={key} className="whitespace-nowrap">
                     {String(customer[key] === undefined || customer[key] === null ? 'N/A' : customer[key])}
@@ -372,7 +387,7 @@ export function CustomerTableAdmin() {
             ))}
              {paginatedCustomers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7 + allCustomFieldKeys.length + 1} className="h-24 text-center">
+                <TableCell colSpan={9 + allCustomFieldKeys.length + 1} className="h-24 text-center">
                   No customers found.
                 </TableCell>
               </TableRow>

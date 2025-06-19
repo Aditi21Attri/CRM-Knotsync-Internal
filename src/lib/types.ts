@@ -28,6 +28,7 @@ export interface Customer {
   status: CustomerStatus;
   assignedTo: string | null; // Employee ID
   notes?: string;
+  createdAt: string; // ISO date string
   lastContacted?: string; // ISO date string
   // Additional generic fields from Excel can be added here or handled dynamically
   [key: string]: any; 
@@ -46,6 +47,7 @@ export interface ExcelRowData {
 
 // Represents the data structure after admin has mapped Excel columns
 // It's essentially what a new Customer object would look like before ID, status, assignment.
-export interface MappedCustomerData extends Omit<Customer, 'id' | 'status' | 'assignedTo' | 'lastContacted' | 'notes'> {
+export interface MappedCustomerData extends Omit<Customer, 'id' | 'status' | 'assignedTo' | 'lastContacted' | 'createdAt' | 'notes'> {
   // Fields are dynamically determined by Excel import and mapping
 }
+
