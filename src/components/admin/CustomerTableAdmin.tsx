@@ -28,7 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { CustomerEditForm } from "@/components/shared/CustomerEditForm";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 const statusColors: Record<CustomerStatus, string> = {
@@ -47,6 +48,8 @@ export function CustomerTableAdmin() {
   const [categoryFilter, setCategoryFilter] = useState<string | "all">("all");
   const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
   const getInitials = (name: string) => {
     if (!name) return "??";
@@ -143,6 +146,10 @@ export function CustomerTableAdmin() {
     updateCustomerStatus(customerId, newStatus);
   };
 
+  const handleEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setIsEditModalOpen(true);
+  };
 
   if (dataLoading) return <div className="flex justify-center items-center h-[calc(100vh-20rem)]"><LoadingSpinner message="Loading customers..." /></div>;
 
@@ -315,7 +322,7 @@ export function CustomerTableAdmin() {
                   </Select>
                 </TableCell>
                 <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => alert(`View/Edit details for ${customer.name}`)} aria-label="Edit customer">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} aria-label="Edit customer">
                         <Edit3 className="h-4 w-4" />
                     </Button>
                 </TableCell>
@@ -353,6 +360,22 @@ export function CustomerTableAdmin() {
             Next
           </Button>
         </div>
+      )}
+      {editingCustomer && (
+        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
+            setIsEditModalOpen(isOpen);
+            if (!isOpen) setEditingCustomer(null);
+          }}>
+          <DialogContent className="sm:max-w-[525px] p-0">
+            <CustomerEditForm 
+                customer={editingCustomer} 
+                onFormSubmit={() => {
+                    setIsEditModalOpen(false);
+                    setEditingCustomer(null);
+                }} 
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

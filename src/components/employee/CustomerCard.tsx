@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3 } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { CustomerEditForm } from '@/components/shared/CustomerEditForm';
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-100 text-green-800 border-green-300 dark:bg-green-800/30 dark:text-green-300 dark:border-green-700",
@@ -28,13 +30,13 @@ export function CustomerCard({ customer }: CustomerCardProps) {
   const [newStatus, setNewStatus] = useState<CustomerStatus>(customer.status);
   const [newNote, setNewNote] = useState('');
   const [isEditingNote, setIsEditingNote] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const handleStatusChange = (status: CustomerStatus) => {
     setNewStatus(status);
-    // If not adding a note, update immediately. Otherwise, update when saving note.
     if (!isEditingNote || !newNote.trim()) {
       updateCustomerStatus(customer.id, status, newNote.trim() || undefined);
-      setNewNote(''); // Clear note after submitting with status change
+      setNewNote(''); 
     }
   };
 
@@ -55,7 +57,7 @@ export function CustomerCard({ customer }: CustomerCardProps) {
   const lastContactedDate = customer.lastContacted ? parseISO(customer.lastContacted) : null;
 
   return (
-    <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
         <Avatar className="h-12 w-12 border-2 border-primary/50">
           <AvatarImage src={`https://placehold.co/80x80/E5EAF7/2962FF?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar" />
@@ -68,11 +70,26 @@ export function CustomerCard({ customer }: CustomerCardProps) {
             {customer.category && <><Tag className="h-3 w-3 mr-1" /> {customer.category}</>}
           </CardDescription>
         </div>
+        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => setIsEditModalOpen(isOpen)}>
+            <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit customer details">
+                    <Edit3 className="h-4 w-4" />
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px] p-0">
+                {isEditModalOpen && (
+                     <CustomerEditForm 
+                        customer={customer} 
+                        onFormSubmit={() => setIsEditModalOpen(false)} 
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-3 text-sm flex-grow">
         <div className="flex items-center text-foreground">
           <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-          <a href={`mailto:${customer.email}`} className="hover:underline">{customer.email}</a>
+          <a href={`mailto:${customer.email}`} className="hover:underline truncate" title={customer.email}>{customer.email}</a>
         </div>
         <div className="flex items-center text-foreground">
           <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -93,7 +110,7 @@ export function CustomerCard({ customer }: CustomerCardProps) {
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
+      <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t mt-auto">
         <div className="flex-1 w-full sm:w-auto">
           <Select value={newStatus} onValueChange={(value) => handleStatusChange(value as CustomerStatus)}>
             <SelectTrigger className="w-full" aria-label="Change customer status">
