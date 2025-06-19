@@ -18,29 +18,42 @@ import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose
 import { useData } from "@/contexts/DataContext";
 import type { Customer } from "@/lib/types";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
-const customerEditFormSchema = z.object({
+// Schema for core, known fields
+const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   phoneNumber: z.string().min(5, { message: "Phone number seems too short." }).optional().or(z.literal('')),
   category: z.string().optional().or(z.literal('')),
+  // Custom fields will be handled as a catchall or dynamically added
 });
 
-type CustomerEditFormValues = z.infer<typeof customerEditFormSchema>;
+// For react-hook-form, allow any additional string properties
+type CustomerEditFormValues = z.infer<typeof customerCoreEditFormSchema> & {
+  [key: string]: any; // Allows for custom fields
+};
 
 interface CustomerEditFormProps {
   customer: Customer;
   onFormSubmit: () => void;
 }
 
+// Standard fields that have dedicated inputs or are managed elsewhere (like id, status, notes etc.)
+const STANDARD_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted'];
+
 export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormProps) {
   const { updateCustomer } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const customFieldKeys = useMemo(() => {
+    return Object.keys(customer).filter(key => !STANDARD_FIELDS.includes(key));
+  }, [customer]);
+
   const form = useForm<CustomerEditFormValues>({
-    resolver: zodResolver(customerEditFormSchema),
+    resolver: zodResolver(customerCoreEditFormSchema), // Validates only core fields
     defaultValues: {
+      ...customer, // Pre-fill all fields, including custom ones
       name: customer.name || "",
       email: customer.email || "",
       phoneNumber: customer.phoneNumber || "",
@@ -50,17 +63,17 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
 
   async function onSubmit(data: CustomerEditFormValues) {
     setIsSubmitting(true);
-    const updatedData: Partial<Customer> = {
-        name: data.name,
-        email: data.email,
-        phoneNumber: data.phoneNumber,
-        category: data.category,
-    };
-    await updateCustomer(customer.id, updatedData);
+    // Data already contains all fields from the form (core + custom)
+    // We pass the whole 'data' object which includes values from dynamically rendered inputs
+    await updateCustomer(customer.id, data as Partial<Customer>);
     setIsSubmitting(false);
-    form.reset(); // Reset form to new default values if needed, or clear
+    // form.reset(); // Might not be needed if dialog closes
     onFormSubmit(); // Close dialog
   }
+
+  const formatLabel = (key: string) => {
+    return key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   return (
     <Form {...form}>
@@ -72,7 +85,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 px-6 py-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
+        <div className="space-y-4 px-6 py-2 max-h-[calc(100vh-22rem)] overflow-y-auto">
           <FormField
             control={form.control}
             name="name"
@@ -104,7 +117,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
             name="phoneNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone Number (Optional)</FormLabel>
+                <FormLabel>Phone Number</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. 555-123-4567" {...field} />
                 </FormControl>
@@ -117,7 +130,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category/Region (Optional)</FormLabel>
+                <FormLabel>Category/Region</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. USA, Tech, Enterprise" {...field} />
                 </FormControl>
@@ -125,6 +138,28 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
               </FormItem>
             )}
           />
+
+          {customFieldKeys.length > 0 && (
+            <div className="pt-4">
+              <h4 className="text-md font-semibold mb-2 text-muted-foreground">Additional Parameters</h4>
+              {customFieldKeys.map(key => (
+                <FormField
+                  key={key}
+                  control={form.control}
+                  name={key}
+                  render={({ field }) => (
+                    <FormItem className="mb-4">
+                      <FormLabel>{formatLabel(key)}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+          )}
         </div>
         
         <DialogFooter className="px-6 pb-6 pt-4 border-t">
@@ -140,3 +175,4 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
     </Form>
   );
 }
+

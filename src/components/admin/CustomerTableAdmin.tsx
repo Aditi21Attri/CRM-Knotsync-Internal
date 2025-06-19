@@ -31,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CustomerEditForm } from "@/components/shared/CustomerEditForm";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { cn } from "@/lib/utils";
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-500 hover:bg-green-600",
@@ -39,6 +40,8 @@ const statusColors: Record<CustomerStatus, string> = {
 };
 
 const ITEMS_PER_PAGE = 10;
+const STANDARD_CUSTOMER_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted'];
+
 
 export function CustomerTableAdmin() {
   const { customers, employees, assignCustomer, updateCustomerStatus, dataLoading } = useData();
@@ -46,7 +49,7 @@ export function CustomerTableAdmin() {
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all">("all");
   const [assignedFilter, setAssignedFilter] = useState<string | "all" | "unassigned">("all");
   const [categoryFilter, setCategoryFilter] = useState<string | "all">("all");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Customer | string | null; direction: 'ascending' | 'descending' }>({ key: 'lastContacted', direction: 'descending' });
   const [currentPage, setCurrentPage] = useState(1);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -69,13 +72,35 @@ export function CustomerTableAdmin() {
     return ["all", ...Array.from(categories).sort()];
   }, [customers]);
 
+  const allCustomFieldKeys = useMemo(() => {
+    const keys = new Set<string>();
+    customers.forEach(customer => {
+      Object.keys(customer).forEach(key => {
+        if (!STANDARD_CUSTOMER_FIELDS.includes(key)) {
+          keys.add(key);
+        }
+      });
+    });
+    return Array.from(keys).sort();
+  }, [customers]);
+
+  const formatHeaderLabel = (key: string) => {
+    if (key === 'name') return 'Name';
+    if (key === 'email') return 'Email';
+    if (key === 'phoneNumber') return 'Phone';
+    if (key === 'category') return 'Category';
+    if (key === 'status') return 'Status';
+    return key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+
   const filteredCustomers = useMemo(() => {
     let filtered = customers;
     if (searchTerm) {
       filtered = filtered.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.category && c.category.toLowerCase().includes(searchTerm.toLowerCase()))
+        Object.values(c).some(val => 
+          String(val).toLowerCase().includes(searchTerm.toLowerCase())
+        )
       );
     }
     if (statusFilter !== "all") {
@@ -96,15 +121,24 @@ export function CustomerTableAdmin() {
     let sortableItems = [...filteredCustomers];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
-        const valA = a[sortConfig.key!];
-        const valB = b[sortConfig.key!];
+        const valA = a[sortConfig.key! as keyof Customer];
+        const valB = b[sortConfig.key! as keyof Customer];
 
-        if (valA === null || valA === undefined) return 1; 
-        if (valB === null || valB === undefined) return -1;
+        if (valA === null || valA === undefined) return sortConfig.direction === 'ascending' ? 1 : -1; 
+        if (valB === null || valB === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
         
         if (typeof valA === 'string' && typeof valB === 'string') {
             return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
+        }
+         if (sortConfig.key === 'lastContacted') {
+            const dateA = new Date(valA as string).getTime();
+            const dateB = new Date(valB as string).getTime();
+            return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
+        }
+
 
         if (valA < valB) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -121,7 +155,7 @@ export function CustomerTableAdmin() {
   const totalPages = Math.ceil(sortedCustomers.length / ITEMS_PER_PAGE);
   const paginatedCustomers = sortedCustomers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  const requestSort = (key: keyof Customer) => {
+  const requestSort = (key: keyof Customer | string) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -129,8 +163,8 @@ export function CustomerTableAdmin() {
     setSortConfig({ key, direction });
   };
 
-  const SortableHead = ({ columnKey, label }: { columnKey: keyof Customer; label: string }) => (
-    <TableHead onClick={() => requestSort(columnKey)} className="cursor-pointer hover:bg-muted/50">
+  const SortableHead = ({ columnKey, label }: { columnKey: keyof Customer | string; label: string }) => (
+    <TableHead onClick={() => requestSort(columnKey)} className="cursor-pointer hover:bg-muted/50 whitespace-nowrap">
       <div className="flex items-center">
         {label}
         {sortConfig.key === columnKey && <ArrowUpDown className="ml-2 h-4 w-4" />}
@@ -160,7 +194,7 @@ export function CustomerTableAdmin() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search customers (name, email, category)..."
+            placeholder="Search all customer fields..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="pl-10 w-full"
@@ -255,29 +289,32 @@ export function CustomerTableAdmin() {
           </TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">Avatar</TableHead>
+              <TableHead className="w-[50px] sticky left-0 bg-background z-10">Avatar</TableHead>
               <SortableHead columnKey="name" label="Name" />
               <SortableHead columnKey="email" label="Email" />
               <SortableHead columnKey="phoneNumber" label="Phone" />
               <SortableHead columnKey="category" label="Category" />
               <SortableHead columnKey="status" label="Status" />
               <TableHead>Assigned To</TableHead>
-              <TableHead className="text-right w-[100px]">Actions</TableHead>
+              {allCustomFieldKeys.map(key => (
+                  <TableHead key={key} className="whitespace-nowrap">{formatHeaderLabel(key)}</TableHead>
+              ))}
+              <TableHead className="text-right w-[100px] sticky right-0 bg-background z-10">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedCustomers.map((customer) => (
               <TableRow key={customer.id}>
-                <TableCell>
+                <TableCell className="sticky left-0 bg-background z-10">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={`https://placehold.co/40x40/E5EAF7/2962FF?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar" />
+                    <AvatarImage src={`https://placehold.co/40x40/E5EAF7/2962FF?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar"/>
                     <AvatarFallback>{getInitials(customer.name)}</AvatarFallback>
                   </Avatar>
                 </TableCell>
-                <TableCell className="font-medium">{customer.name}</TableCell>
-                <TableCell>{customer.email}</TableCell>
-                <TableCell>{customer.phoneNumber}</TableCell>
-                <TableCell>{customer.category || 'N/A'}</TableCell>
+                <TableCell className="font-medium whitespace-nowrap">{customer.name}</TableCell>
+                <TableCell className="whitespace-nowrap">{customer.email}</TableCell>
+                <TableCell className="whitespace-nowrap">{customer.phoneNumber}</TableCell>
+                <TableCell className="whitespace-nowrap">{customer.category || 'N/A'}</TableCell>
                 <TableCell>
                    <Popover>
                     <PopoverTrigger asChild>
@@ -308,7 +345,7 @@ export function CustomerTableAdmin() {
                     value={customer.assignedTo || "unassigned"}
                     onValueChange={(value) => handleAssignCustomer(customer.id, value === "unassigned" ? null : value)}
                   >
-                    <SelectTrigger className="w-[180px] h-9">
+                    <SelectTrigger className="w-[180px] h-9 whitespace-nowrap">
                       <SelectValue placeholder="Assign..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -321,7 +358,12 @@ export function CustomerTableAdmin() {
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell className="text-right">
+                {allCustomFieldKeys.map(key => (
+                  <TableCell key={key} className="whitespace-nowrap">
+                    {String(customer[key] === undefined || customer[key] === null ? 'N/A' : customer[key])}
+                  </TableCell>
+                ))}
+                <TableCell className="text-right sticky right-0 bg-background z-10">
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} aria-label="Edit customer">
                         <Edit3 className="h-4 w-4" />
                     </Button>
@@ -330,7 +372,7 @@ export function CustomerTableAdmin() {
             ))}
              {paginatedCustomers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={7 + allCustomFieldKeys.length + 1} className="h-24 text-center">
                   No customers found.
                 </TableCell>
               </TableRow>
@@ -380,3 +422,4 @@ export function CustomerTableAdmin() {
     </div>
   );
 }
+
