@@ -33,14 +33,14 @@ export async function addCustomerAction(
     const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
     const now = new Date().toISOString();
-    const newCustomerDbData: Omit<Customer, 'id'> = {
+    const newCustomerDbData: Omit<Customer, 'id' | 'createdAt'> & { createdAt: string } = {
       name: customerData.name,
-      email: customerData.email,
-      phoneNumber: customerData.phoneNumber,
+      email: customerData.email.toLowerCase(),
+      phoneNumber: customerData.phoneNumber?.trim() || '',
       category: customerData.category,
       status: status,
       assignedTo: assignedTo,
-      notes: '', // Initialize notes as empty for CSV import
+      notes: '', 
       createdAt: now,
       lastContacted: now,
       ...Object.fromEntries(Object.entries(customerData).filter(([key]) => !['name', 'email', 'phoneNumber', 'category'].includes(key)))
@@ -89,16 +89,15 @@ export async function handleManualAddCustomerAction(
     const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     const now = new Date().toISOString();
 
-    // Check for duplicates
-    const queryConditions = [];
-    if (formData.email) queryConditions.push({ email: formData.email.toLowerCase() });
-    if (formData.phoneNumber && formData.phoneNumber.trim() !== "") queryConditions.push({ phoneNumber: formData.phoneNumber });
-    
-    let existingCustomerDoc: Omit<Customer, 'id'> | null = null;
-    if (queryConditions.length > 0) {
-        existingCustomerDoc = await customersCollection.findOne({ $or: queryConditions });
-    }
+    const normalizedEmail = formData.email.toLowerCase();
+    const trimmedPhoneNumber = formData.phoneNumber?.trim() || ""; // Consistent handling
 
+    const orConditions = [{ email: normalizedEmail }];
+    if (trimmedPhoneNumber !== "") {
+      orConditions.push({ phoneNumber: trimmedPhoneNumber });
+    }
+    
+    const existingCustomerDoc = await customersCollection.findOne({ $or: orConditions });
 
     if (existingCustomerDoc) {
       // Duplicate found, update lastContacted
@@ -115,11 +114,11 @@ export async function handleManualAddCustomerAction(
     } else {
       // No duplicate, create new customer
       const assignedTo = currentUserRole === 'employee' ? currentUserId : null;
-      const newCustomerData: Omit<Customer, 'id'> = {
+      const newCustomerData: Omit<Customer, 'id' | 'createdAt'> & { createdAt: string } = {
         name: formData.name,
-        email: formData.email.toLowerCase(),
-        phoneNumber: formData.phoneNumber || '',
-        category: formData.category || '',
+        email: normalizedEmail, // Store normalized email
+        phoneNumber: trimmedPhoneNumber, // Store normalized phone number
+        category: formData.category?.trim() || '',
         status: 'neutral',
         assignedTo: assignedTo,
         notes: '',
@@ -150,14 +149,23 @@ export async function updateCustomerAction(customerId: string, updatedCustomerDa
     const db = await connectToDatabase();
     const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
-    const updatePayload = { 
-        ...updatedCustomerData, 
-        lastContacted: new Date().toISOString() 
-    };
+    // Ensure email is lowercased if present in update
+    const updatePayload = { ...updatedCustomerData };
+    if (updatePayload.email) {
+        updatePayload.email = updatePayload.email.toLowerCase();
+    }
+    if (updatePayload.phoneNumber) {
+        updatePayload.phoneNumber = updatePayload.phoneNumber.trim();
+    }
     
+    updatePayload.lastContacted = new Date().toISOString();
+    
+    // Explicitly exclude createdAt from the $set operation
+    const { createdAt, ...setData } = updatePayload;
+
     const result = await customersCollection.findOneAndUpdate(
       { _id: new ObjectId(customerId) },
-      { $set: updatePayload },
+      { $set: setData },
       { returnDocument: 'after' }
     );
     
@@ -260,3 +268,4 @@ export async function deleteAllCustomersAction(): Promise<{ success: boolean; de
     throw new Error(`Failed to delete all customers. Details: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
