@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { currentUser } = useAuth();
@@ -53,7 +54,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-lg">
+        <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="font-headline">Quick Actions</CardTitle>
             <CardDescription>Jump directly to key sections.</CardDescription>
@@ -77,7 +78,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg overflow-hidden">
+        <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
             <CardHeader>
                 <CardTitle className="font-headline">Welcome to Stratagem CRM</CardTitle>
                 <CardDescription>Your central hub for customer relationship management.</CardDescription>
@@ -88,7 +89,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="aspect-video relative rounded-md overflow-hidden">
                     <Image 
-                        src="https://placehold.co/600x338/e5eaf7/2962ff" 
+                        src="https://placehold.co/600x338/e0e7ff/3730a3" 
                         alt="CRM Dashboard Illustration" 
                         layout="fill"
                         objectFit="cover"

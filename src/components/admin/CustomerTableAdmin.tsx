@@ -280,7 +280,7 @@ export function CustomerTableAdmin() {
         </div>
       </div>
 
-      <div className="rounded-lg border shadow-sm overflow-x-auto">
+      <div className="rounded-lg border shadow-md overflow-x-auto">
         <Table>
           <TableCaption>
             {paginatedCustomers.length > 0 
@@ -307,7 +307,7 @@ export function CustomerTableAdmin() {
               <TableRow key={customer.id}>
                 <TableCell className="sticky left-0 bg-background z-10">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={`https://placehold.co/40x40/E5EAF7/2962FF?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar"/>
+                    <AvatarImage src={`https://placehold.co/40x40/e0e7ff/3730a3?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar"/>
                     <AvatarFallback>{getInitials(customer.name)}</AvatarFallback>
                   </Avatar>
                 </TableCell>
@@ -422,4 +422,3 @@ export function CustomerTableAdmin() {
     </div>
   );
 }
-

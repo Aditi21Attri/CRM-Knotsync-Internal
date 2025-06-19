@@ -10,12 +10,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { MappedCustomerData, ExcelRowData, User } from "@/lib/types";
-import { UploadCloud, AlertTriangle, CheckCircle, Loader2, ListChecks, PlusCircle, XCircle } from "lucide-react";
+import { UploadCloud, AlertTriangle, CheckCircle, Loader2, ListChecks, PlusCircle, XCircle, ArrowRight, StepForward } from "lucide-react";
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
 
 const customerFields: (keyof MappedCustomerData)[] = ["name", "email", "phoneNumber", "category"];
-const NONE_VALUE = "__NONE__"; // Special value for "Not Mapped"
+const NONE_VALUE = "__NONE__"; 
 
 interface CustomFieldMap {
   id: string;
@@ -96,7 +96,7 @@ export function ExcelImportForm() {
             if (matchedHeader) {
                 initialMapping[field] = matchedHeader;
             } else {
-                initialMapping[field] = ''; // Default to unmapped
+                initialMapping[field] = ''; 
             }
         });
         setColumnMapping(initialMapping);
@@ -308,16 +308,16 @@ export function ExcelImportForm() {
           <UploadCloud className="mr-3 h-7 w-7 text-primary" /> Import Customer Data (CSV)
         </CardTitle>
         <CardDescription>
-          Upload CSV, map columns to standard customer fields, and optionally add custom field mappings.
-          Customers may be auto-assigned if their 'Category' (region) matches an employee's specialized region.
+          Upload a CSV file, map its columns to CRM fields, and import customer data. 
           Only explicitly mapped columns (standard or custom) will be imported.
+          Customers may be auto-assigned if their 'Category' (region) matches an employee's specialized region.
         </CardDescription>
       </CardHeader>
 
       {step === 1 && (
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 py-8">
           <div>
-            <Label htmlFor="file-upload" className="text-base">Upload CSV File</Label>
+            <Label htmlFor="file-upload" className="text-md font-medium">1. Upload CSV File</Label>
             <Input id="file-upload" type="file" accept=".csv" onChange={handleFileChange} className="mt-2 text-base file:text-primary file:font-semibold hover:file:bg-primary/10"/>
             {file && <p className="mt-2 text-sm text-muted-foreground">Selected file: {file.name}</p>}
           </div>
@@ -329,7 +329,7 @@ export function ExcelImportForm() {
             </Alert>
           )}
           <Button onClick={handleParseFile} disabled={!file || isLoading} className="w-full text-lg py-3">
-            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ListChecks className="mr-2 h-5 w-5" />}
+            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <StepForward className="mr-2 h-5 w-5" />}
             Parse File & Proceed to Mapping
           </Button>
         </CardContent>
@@ -337,35 +337,35 @@ export function ExcelImportForm() {
 
       {step === 2 && headers.length > 0 && (
         <form onSubmit={(e) => { e.preventDefault(); handleProceedToReview(); }}>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-8 py-8">
             <div>
-                <h3 className="text-xl font-semibold text-foreground">Map CSV Columns to Standard Customer Fields</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <h3 className="text-xl font-semibold text-foreground mb-1">2. Map CSV Columns</h3>
+                <p className="text-sm text-muted-foreground mb-6">
                     Select the CSV column for each standard CRM field (Name and Email are required).
                     Map your 'Country' or 'Region' CSV column to the 'Category' field for regional auto-assignment.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     {customerFields.map(field => (
-                        <div key={field} className="space-y-2 p-4 border rounded-md bg-background/50">
-                        <Label htmlFor={`map-${field}`} className="text-base font-medium capitalize">{formatPreviewKey(field)}{field === 'category' ? ' (for Region)' : ''}{field === 'name' || field === 'email' ? ' (Required)' : ''}</Label>
+                        <div key={field} className="space-y-1 p-4 border rounded-lg bg-secondary/30 shadow-sm">
+                        <Label htmlFor={`map-${field}`} className="text-sm font-medium capitalize">{formatPreviewKey(field)}{field === 'category' ? ' (for Region)' : ''}{field === 'name' || field === 'email' ? <span className="text-destructive">*</span> : ''}</Label>
                         <Select
                             onValueChange={(value) => handleMappingChange(field, value)}
                             value={columnMapping[field] || NONE_VALUE}
                             required={field === "name" || field === "email"}
                         >
-                            <SelectTrigger id={`map-${field}`} className="w-full text-base">
+                            <SelectTrigger id={`map-${field}`} className="w-full text-sm bg-background">
                             <SelectValue placeholder="Select CSV Column" />
                             </SelectTrigger>
                             <SelectContent>
                             <SelectItem value={NONE_VALUE}>-- Not Mapped --</SelectItem>
                             {headers.map(header => (
-                                <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
+                                <SelectItem key={header} value={header} className="text-sm">{header}</SelectItem>
                             ))}
                             </SelectContent>
                         </Select>
                         {parsedData[0] && columnMapping[field] && (
-                            <p className="text-xs text-muted-foreground truncate">
-                                Preview: <span className="font-mono text-foreground/80">{String(parsedData[0][columnMapping[field]!]) || "N/A"}</span>
+                            <p className="text-xs text-muted-foreground truncate pt-1">
+                                Preview (1st row): <span className="font-mono text-foreground/80">{String(parsedData[0][columnMapping[field]!]) || "N/A"}</span>
                             </p>
                         )}
                         </div>
@@ -374,30 +374,32 @@ export function ExcelImportForm() {
             </div>
             
             <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-foreground">Custom Field Mappings (Optional)</h3>
+                <h3 className="text-lg font-semibold text-foreground">Custom Field Mappings (Optional)</h3>
                  <p className="text-sm text-muted-foreground">
                     Map any other columns from your CSV to custom fields in the CRM. Provide a unique CRM Field Name for each.
                     Only explicitly mapped columns (standard or custom) will be imported.
                 </p>
                 {customFieldMappings.map((mapping, index) => (
-                    <div key={mapping.id} className="flex flex-col md:flex-row items-start md:items-end gap-4 p-4 border rounded-md bg-background/50">
+                    <div key={mapping.id} className="flex flex-col md:flex-row items-start md:items-end gap-4 p-4 border rounded-lg bg-secondary/30 shadow-sm">
                         <div className="flex-1 w-full md:w-auto">
-                            <Label htmlFor={`custom-crm-${mapping.id}`} className="text-sm font-medium">CRM Field Name</Label>
+                            <Label htmlFor={`custom-crm-${mapping.id}`} className="text-sm font-medium">CRM Field Name <span className="text-destructive">*</span></Label>
                             <Input 
                                 id={`custom-crm-${mapping.id}`}
                                 value={mapping.crmFieldName}
                                 onChange={(e) => updateCustomFieldMap(index, 'crmFieldName', e.target.value)}
-                                placeholder="e.g., Company Size, Source"
-                                className="mt-1 text-base"
+                                placeholder="e.g., Company Size"
+                                className="mt-1 text-sm bg-background"
+                                required={!!mapping.csvColumnName}
                             />
                         </div>
                         <div className="flex-1 w-full md:w-auto">
-                             <Label htmlFor={`custom-csv-${mapping.id}`} className="text-sm font-medium">CSV Column</Label>
+                             <Label htmlFor={`custom-csv-${mapping.id}`} className="text-sm font-medium">CSV Column <span className="text-destructive">*</span></Label>
                             <Select
                                 value={mapping.csvColumnName || NONE_VALUE}
                                 onValueChange={(value) => updateCustomFieldMap(index, 'csvColumnName', value)}
+                                required={!!mapping.crmFieldName.trim()}
                             >
-                                <SelectTrigger id={`custom-csv-${mapping.id}`} className="w-full mt-1 text-base">
+                                <SelectTrigger id={`custom-csv-${mapping.id}`} className="w-full mt-1 text-sm bg-background">
                                     <SelectValue placeholder="Select CSV Column" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -406,17 +408,17 @@ export function ExcelImportForm() {
                                         !Object.values(columnMapping).includes(h) && 
                                         !customFieldMappings.some((cfm, cfmIndex) => cfmIndex !== index && cfm.csvColumnName === h)
                                     ).map(header => (
-                                        <SelectItem key={header} value={header} className="text-base">{header}</SelectItem>
+                                        <SelectItem key={header} value={header} className="text-sm">{header}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeCustomFieldMap(mapping.id)} aria-label="Remove custom mapping" className="text-destructive hover:text-destructive/80 mt-2 md:mt-0">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeCustomFieldMap(mapping.id)} aria-label="Remove custom mapping" className="text-destructive hover:text-destructive/80 mt-2 md:mt-0 self-center md:self-end">
                             <XCircle className="h-5 w-5" />
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" onClick={addCustomFieldMap} className="text-base">
+                <Button type="button" variant="outline" onClick={addCustomFieldMap} className="text-sm">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Custom Field Mapping
                 </Button>
             </div>
@@ -429,10 +431,10 @@ export function ExcelImportForm() {
             </Alert>
           )}
           </CardContent>
-          <CardFooter className="flex justify-between">
+          <CardFooter className="flex justify-between border-t pt-6">
             <Button variant="outline" onClick={() => {setStep(1); setError(null); setFirstRecordPreview(null);}} disabled={isLoading}>Back to Upload</Button>
             <Button type="submit" disabled={isLoading} className="text-lg py-3">
-              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
               Review & Import
             </Button>
           </CardFooter>
@@ -441,21 +443,20 @@ export function ExcelImportForm() {
       
       {step === 3 && (
           <>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 py-8">
                 <div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">Review Import</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-1">3. Review & Confirm Import</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                      You are about to import <strong>{parsedData.length}</strong> records. 
-                      Customers may be auto-assigned to employees based on matching specialized regions (using the 'Category' field).
-                      Below is a preview of all data parameters that will be imported for the first record based on your mappings.
-                      Database keys for custom fields are derived from the 'CRM Field Name' you provided (lowercased, spaces to underscores).
+                      You are about to import <strong>{parsedData.length}</strong> customer record(s). 
+                      Verify the data preview for the first record below.
                   </p>
                    {firstRecordPreview ? (
-                    <div className="space-y-2 p-4 border rounded-md bg-secondary/50 max-h-60 overflow-y-auto mb-6">
+                    <div className="space-y-2 p-4 border rounded-lg bg-secondary/30 shadow-sm max-h-60 overflow-y-auto mb-6">
+                      <h4 className="text-sm font-semibold text-foreground mb-2">Preview of First Record:</h4>
                       {Object.entries(firstRecordPreview).map(([key, value]) => (
-                        <div key={key} className="flex justify-between text-sm items-start">
-                          <span className="font-semibold text-muted-foreground mr-2">{formatPreviewKey(key)}:</span>
-                          <span className="font-mono text-foreground text-right break-all">{String(value)}</span>
+                        <div key={key} className="grid grid-cols-3 gap-2 text-sm items-start">
+                          <span className="font-medium text-muted-foreground col-span-1 break-words">{formatPreviewKey(key)}:</span>
+                          <span className="font-mono text-foreground col-span-2 break-all">{String(value)}</span>
                         </div>
                       ))}
                     </div>
@@ -465,18 +466,18 @@ export function ExcelImportForm() {
                 </div>
 
                 <div>
-                  <Label htmlFor="assign-employee" className="text-base font-medium">Default Assignee (Fallback)</Label>
+                  <Label htmlFor="assign-employee" className="text-md font-medium">Default Assignee (Fallback)</Label>
                   <Select 
                       onValueChange={(value) => setDefaultSelectedEmployeeId(value)} 
                       value={defaultSelectedEmployeeId}
                   >
-                      <SelectTrigger id="assign-employee" className="w-full md:w-1/2 mt-2 text-base">
+                      <SelectTrigger id="assign-employee" className="w-full md:w-1/2 mt-1 text-sm bg-background">
                           <SelectValue placeholder="Select default employee..." />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="unassigned" className="text-base">Unassigned (or auto-assign by region)</SelectItem>
+                          <SelectItem value="unassigned" className="text-sm">Unassigned (or auto-assign by region)</SelectItem>
                           {employees.map((employee: User) => (
-                              <SelectItem key={employee.id} value={employee.id} className="text-base">
+                              <SelectItem key={employee.id} value={employee.id} className="text-sm">
                                   {employee.name} {employee.specializedRegion && `(${employee.specializedRegion})`}
                               </SelectItem>
                           ))}
@@ -502,7 +503,7 @@ export function ExcelImportForm() {
                   </Alert>
                 )}
             </CardContent>
-            <CardFooter className="flex justify-between">
+            <CardFooter className="flex justify-between border-t pt-6">
               <Button variant="outline" onClick={() => {setStep(2); setError(null); setSuccessMessage(null); }} disabled={isLoading}>Back to Mapping</Button>
               <Button onClick={handleImportData} disabled={isLoading || !!successMessage || !firstRecordPreview} className="text-lg py-3">
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
@@ -515,5 +516,3 @@ export function ExcelImportForm() {
     </Card>
   );
 }
-
-    

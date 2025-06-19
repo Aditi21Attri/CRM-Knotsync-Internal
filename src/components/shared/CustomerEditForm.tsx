@@ -20,17 +20,15 @@ import type { Customer } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 
-// Schema for core, known fields, now with .passthrough()
 const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   phoneNumber: z.string().min(5, { message: "Phone number seems too short." }).optional().or(z.literal('')),
   category: z.string().optional().or(z.literal('')),
-}).passthrough(); // Allow additional fields not defined in the schema
+}).passthrough(); 
 
-// For react-hook-form, allow any additional string properties
 type CustomerEditFormValues = z.infer<typeof customerCoreEditFormSchema> & {
-  [key: string]: any; // Allows for custom fields
+  [key: string]: any; 
 };
 
 interface CustomerEditFormProps {
@@ -38,7 +36,6 @@ interface CustomerEditFormProps {
   onFormSubmit: () => void;
 }
 
-// Standard fields that have dedicated inputs or are managed elsewhere (like id, status, notes etc.)
 const STANDARD_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', 'category', 'status', 'assignedTo', 'notes', 'lastContacted'];
 
 export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormProps) {
@@ -74,14 +71,14 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="font-headline">Edit Customer: {customer.name}</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="font-headline text-xl">Edit Customer: {customer.name}</DialogTitle>
+          <DialogDescription className="text-sm">
             Update the details for this customer. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 px-6 py-2 max-h-[calc(100vh-22rem)] overflow-y-auto">
+        <div className="space-y-4 px-6 max-h-[calc(100vh-22rem)] overflow-y-auto pb-2">
           <FormField
             control={form.control}
             name="name"
@@ -137,7 +134,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
 
           {customFieldKeys.length > 0 && (
             <div className="pt-4">
-              <h4 className="text-md font-semibold mb-2 text-muted-foreground">Additional Parameters</h4>
+              <h4 className="text-md font-semibold mb-3 text-muted-foreground border-b pb-2">Additional Parameters</h4>
               {customFieldKeys.map(key => (
                 <FormField
                   key={key}
@@ -149,7 +146,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                       <FormControl>
                         <Input 
                           {...field} 
-                          value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                           value={field.value === null || field.value === undefined ? '' : String(field.value)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -174,4 +171,3 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
     </Form>
   );
 }
-

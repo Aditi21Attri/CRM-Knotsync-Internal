@@ -29,9 +29,9 @@ export default function EmployeeAnalyticsPage() {
   }, [myCustomers]);
   
   const chartData = [
-    { name: 'Hot', count: customerStats.hot, fill: 'hsl(var(--chart-2))' }, // Greenish
-    { name: 'Neutral', count: customerStats.neutral, fill: 'hsl(var(--chart-4))' }, // Yellowish
-    { name: 'Cold', count: customerStats.cold, fill: 'hsl(var(--chart-1))' }, // Reddish
+    { name: 'Hot', count: customerStats.hot, fill: 'hsl(var(--chart-2))' }, 
+    { name: 'Neutral', count: customerStats.neutral, fill: 'hsl(var(--chart-4))' }, 
+    { name: 'Cold', count: customerStats.cold, fill: 'hsl(var(--chart-1))' }, 
   ];
 
   if (dataLoading) {
@@ -57,7 +57,7 @@ export default function EmployeeAnalyticsPage() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-lg">
+        <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="font-headline flex items-center">
               <PieChart className="mr-2 h-5 w-5 text-primary" /> Customer Status Distribution
@@ -89,7 +89,7 @@ export default function EmployeeAnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg overflow-hidden">
+        <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
             <CardHeader>
                 <CardTitle className="font-headline flex items-center">
                     <Activity className="mr-2 h-5 w-5 text-primary" /> Activity Insights
@@ -99,7 +99,7 @@ export default function EmployeeAnalyticsPage() {
             <CardContent className="space-y-4">
                  <div className="aspect-video relative rounded-md overflow-hidden mb-4">
                     <Image 
-                        src="https://placehold.co/600x338/2962ff/e5eaf7" // Placeholder for a relevant image
+                        src="https://placehold.co/600x338/3730a3/e0e7ff" 
                         alt="Data Analytics Illustration" 
                         layout="fill"
                         objectFit="cover"

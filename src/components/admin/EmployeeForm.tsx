@@ -27,18 +27,16 @@ const employeeFormSchemaBase = z.object({
   specializedRegion: z.string().optional().describe("The region the employee specializes in, e.g., USA, UK."),
 });
 
-// Schema for adding an employee (password is required)
 const addEmployeeFormSchema = employeeFormSchemaBase.extend({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
-// Schema for editing an employee (password is optional or not included)
 const editEmployeeFormSchema = employeeFormSchemaBase;
 
 
 interface EmployeeFormProps {
-  employee?: User; // Optional: for editing an existing employee
-  onFormSubmit?: () => void; // Optional: callback after successful submission
+  employee?: User; 
+  onFormSubmit?: () => void; 
 }
 
 export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
@@ -72,14 +70,14 @@ export function EmployeeForm({ employee, onFormSubmit }: EmployeeFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <DialogHeader>
-          <DialogTitle className="font-headline">{employee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
-          <FormDialogDescription>
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="font-headline text-xl">{employee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
+          <FormDialogDescription className="text-sm">
             {employee ? "Update the details, role, and specialized region of the employee." : "Enter details, assign role, set password, and optionally a specialized region."}
           </FormDialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 px-6 py-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
+        <div className="space-y-4 px-6 max-h-[calc(100vh-20rem)] overflow-y-auto">
           <FormField
             control={form.control}
             name="name"

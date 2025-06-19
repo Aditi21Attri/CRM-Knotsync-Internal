@@ -50,8 +50,8 @@ export default function PerformancePage() {
 
   const topPerformingEmployees = useMemo(() => {
     return [...employeePerformanceData]
-      .sort((a, b) => b.hot - a.hot || b.totalAssigned - a.totalAssigned) // Sort by hot, then by total assigned
-      .slice(0, 3); // Show top 3
+      .sort((a, b) => b.hot - a.hot || b.totalAssigned - a.totalAssigned) 
+      .slice(0, 3); 
   }, [employeePerformanceData]);
 
   const overallStatusCounts = useMemo(() => {
@@ -90,10 +90,10 @@ export default function PerformancePage() {
         {topPerformingEmployees.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {topPerformingEmployees.map(data => (
-              <Card key={data.employee.id} className="shadow-lg hover:shadow-xl transition-shadow">
+              <Card key={data.employee.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
                 <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-3">
                    <Avatar className="h-12 w-12 border-2 border-primary/50">
-                      <AvatarImage src={data.employee.avatarUrl || `https://placehold.co/80x80/E5EAF7/2962FF?text=${getInitials(data.employee.name)}`} alt={data.employee.name} data-ai-hint="employee avatar" />
+                      <AvatarImage src={data.employee.avatarUrl || `https://placehold.co/80x80/e0e7ff/3730a3?text=${getInitials(data.employee.name)}`} alt={data.employee.name} data-ai-hint="employee avatar" />
                       <AvatarFallback>{getInitials(data.employee.name)}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -121,7 +121,7 @@ export default function PerformancePage() {
 
       <section className="space-y-6">
         <h2 className="text-2xl font-headline font-semibold flex items-center"><UserCheck className="mr-3 h-7 w-7 text-primary" /> Customer Status per Employee</h2>
-        <Card className="shadow-lg">
+        <Card className="shadow-md">
           <CardContent className="p-0">
             {employeePerformanceData.length > 0 ? (
               <div className="overflow-x-auto">
@@ -141,7 +141,7 @@ export default function PerformancePage() {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9">
-                              <AvatarImage src={data.employee.avatarUrl || `https://placehold.co/40x40/E5EAF7/2962FF?text=${getInitials(data.employee.name)}`} alt={data.employee.name} data-ai-hint="employee avatar" />
+                              <AvatarImage src={data.employee.avatarUrl || `https://placehold.co/40x40/e0e7ff/3730a3?text=${getInitials(data.employee.name)}`} alt={data.employee.name} data-ai-hint="employee avatar" />
                               <AvatarFallback>{getInitials(data.employee.name)}</AvatarFallback>
                             </Avatar>
                             <div>
@@ -168,7 +168,7 @@ export default function PerformancePage() {
       
       <section className="space-y-6">
         <h2 className="text-2xl font-headline font-semibold flex items-center"><PieChart className="mr-3 h-7 w-7 text-primary" /> Overall Customer Status Distribution</h2>
-        <Card className="shadow-lg">
+        <Card className="shadow-md">
           <CardHeader>
             <CardTitle>System-Wide Customer Status</CardTitle>
             <CardDescription>Current breakdown of all customers by status.</CardDescription>
@@ -203,4 +203,3 @@ export default function PerformancePage() {
     </div>
   );
 }
-
