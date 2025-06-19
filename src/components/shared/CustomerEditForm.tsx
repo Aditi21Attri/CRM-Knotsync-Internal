@@ -20,14 +20,13 @@ import type { Customer } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 
-// Schema for core, known fields
+// Schema for core, known fields, now with .passthrough()
 const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   phoneNumber: z.string().min(5, { message: "Phone number seems too short." }).optional().or(z.literal('')),
   category: z.string().optional().or(z.literal('')),
-  // Custom fields will be handled as a catchall or dynamically added
-});
+}).passthrough(); // Allow additional fields not defined in the schema
 
 // For react-hook-form, allow any additional string properties
 type CustomerEditFormValues = z.infer<typeof customerCoreEditFormSchema> & {
@@ -51,9 +50,9 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
   }, [customer]);
 
   const form = useForm<CustomerEditFormValues>({
-    resolver: zodResolver(customerCoreEditFormSchema), // Validates only core fields
+    resolver: zodResolver(customerCoreEditFormSchema), 
     defaultValues: {
-      ...customer, // Pre-fill all fields, including custom ones
+      ...customer, 
       name: customer.name || "",
       email: customer.email || "",
       phoneNumber: customer.phoneNumber || "",
@@ -63,11 +62,9 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
 
   async function onSubmit(data: CustomerEditFormValues) {
     setIsSubmitting(true);
-    // Data already contains all fields from the form (core + custom)
-    // We pass the whole 'data' object which includes values from dynamically rendered inputs
     await updateCustomer(customer.id, data as Partial<Customer>);
     setIsSubmitting(false);
-    onFormSubmit(); // Close dialog
+    onFormSubmit(); 
   }
 
   const formatLabel = (key: string) => {
@@ -152,8 +149,6 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                       <FormControl>
                         <Input 
                           {...field} 
-                          // Ensure value is a string for the input.
-                          // Handles null, undefined, or other types by converting to string or empty string.
                           value={field.value === null || field.value === undefined ? '' : String(field.value)}
                         />
                       </FormControl>
@@ -179,3 +174,4 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
     </Form>
   );
 }
+
