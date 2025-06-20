@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -10,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3, Clock } from "lucide-react";
+import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3, Clock, Bell } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { CustomerEditForm } from '@/components/shared/CustomerEditForm';
+import { FollowUpReminderDialog } from '@/components/shared/FollowUpReminderDialog';
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-100 text-green-800 border-green-300 dark:bg-green-800/30 dark:text-green-300 dark:border-green-700",
@@ -123,8 +123,7 @@ export function CustomerCard({ customer }: CustomerCardProps) {
             </h4>
             <p className="text-xs text-foreground whitespace-pre-wrap max-h-20 overflow-y-auto">{customer.notes.split('\n').pop()}</p>
           </div>
-        )}
-      </CardContent>
+        )}      </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4 border-t mt-auto">
         <div className="flex-1 w-full sm:w-auto">
           <Select value={newStatus} onValueChange={(value) => handleStatusChange(value as CustomerStatus)}>
@@ -138,30 +137,40 @@ export function CustomerCard({ customer }: CustomerCardProps) {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex-1 w-full sm:w-auto">
-            {isEditingNote ? (
-                <div className="space-y-2 w-full">
-                    <Textarea 
-                        placeholder="Add a new note..." 
-                        value={newNote} 
-                        onChange={(e) => setNewNote(e.target.value)}
-                        className="text-sm"
-                        rows={2}
-                    />
-                    <div className="flex gap-2">
-                        <Button onClick={handleSaveNoteAndStatus} size="sm" className="w-full">
-                            <Save className="h-4 w-4 mr-2"/> Save Note & Status
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => { setIsEditingNote(false); setNewNote(''); setNewStatus(customer.status);}} className="w-full">
-                            Cancel
-                        </Button>
-                    </div>
-                </div>
-            ) : (
-                 <Button variant="outline" onClick={() => setIsEditingNote(true)} className="w-full">
-                    <Edit2 className="h-4 w-4 mr-2" /> Add/Edit Note
-                </Button>
-            )}
+        <div className="flex gap-2 w-full sm:w-auto">
+          <FollowUpReminderDialog 
+            customerId={customer.id}
+            customerName={customer.name}
+            trigger={
+              <Button variant="outline" size="sm" className="flex-1">
+                <Bell className="h-4 w-4 mr-2" />
+                Follow Up
+              </Button>
+            }
+          />
+          {isEditingNote ? (
+              <div className="space-y-2 w-full flex-1">
+                  <Textarea 
+                      placeholder="Add a new note..." 
+                      value={newNote} 
+                      onChange={(e) => setNewNote(e.target.value)}
+                      className="text-sm"
+                      rows={2}
+                  />
+                  <div className="flex gap-2">
+                      <Button onClick={handleSaveNoteAndStatus} size="sm" className="w-full">
+                          <Save className="h-4 w-4 mr-2"/> Save Note & Status
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => { setIsEditingNote(false); setNewNote(''); setNewStatus(customer.status);}} className="w-full">
+                          Cancel
+                      </Button>
+                  </div>
+              </div>
+          ) : (
+               <Button variant="outline" onClick={() => setIsEditingNote(true)} size="sm" className="flex-1">
+                  <Edit2 className="h-4 w-4 mr-2" /> Add/Edit Note
+              </Button>
+          )}
         </div>
       </CardFooter>
     </Card>

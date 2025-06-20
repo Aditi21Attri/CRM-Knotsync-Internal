@@ -1,6 +1,6 @@
 import type { UserRole } from "./types";
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Users, UserPlus, FileInput, BarChart3, Briefcase, UserCheck, Settings } from "lucide-react";
+import { LayoutDashboard, Users, UserPlus, FileInput, BarChart3, Briefcase, UserCheck, Settings, Bell } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -49,6 +49,13 @@ export const navItems: NavItem[] = [
     tooltip: "Performance"
   },
   {
+    href: "/admin/follow-ups",
+    label: "Follow-up Reminders",
+    icon: Bell,
+    roles: ["admin"],
+    tooltip: "Follow-ups"
+  },
+  {
     href: "/admin/leads",
     label: "Leads",
     icon: UserPlus,
@@ -75,6 +82,13 @@ export const navItems: NavItem[] = [
     icon: UserPlus,
     roles: ["employee"],
     tooltip: "Assigned Leads"
+  },
+  {
+    href: "/employee/follow-ups",
+    label: "My Follow-ups",
+    icon: Bell,
+    roles: ["employee"],
+    tooltip: "Follow-ups"
   },
   // Example of a group with sub-items (if needed later)
   // {

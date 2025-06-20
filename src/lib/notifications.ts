@@ -5,6 +5,24 @@ export async function sendLeadNotification({ name, email, phoneNumber, source, a
   await sendWhatsAppNotification({ name, email, phoneNumber, source, assignedTo });
 }
 
+// Follow-up reminder notifications
+export async function sendFollowUpReminderNotification({ 
+  reminder, 
+  userEmail, 
+  userName 
+}: { 
+  reminder: any; 
+  userEmail: string; 
+  userName: string; 
+}) {
+  // Send email notification for follow-up reminder
+  await sendFollowUpEmailNotification({ reminder, userEmail, userName });
+  // Send WhatsApp notification for follow-up reminder (if phone number is available)
+  if (reminder.customerPhoneNumber) {
+    await sendFollowUpWhatsAppNotification({ reminder, userEmail, userName });
+  }
+}
+
 async function sendEmailNotification({ name, email, phoneNumber, source, assignedTo }: { name: string; email: string; phoneNumber?: string; source: string; assignedTo?: { id: string; name: string; email: string } }) {
   // TODO: Integrate with SendGrid, Nodemailer, etc.
   const handlerText = assignedTo ? `\n\n${assignedTo.name} will be in touch with you for your further queries.` : '';
@@ -57,4 +75,30 @@ async function sendWhatsAppNotification({ name, email, phoneNumber, source, assi
   } else {
     console.log(`[WHATSAPP] No phone number for ${name}, skipping UltraMsg send.`);
   }
-} 
+}
+
+async function sendFollowUpEmailNotification({ 
+  reminder, 
+  userEmail, 
+  userName 
+}: { 
+  reminder: any; 
+  userEmail: string; 
+  userName: string; 
+}) {
+  // TODO: Integrate with SendGrid, Nodemailer, etc.
+  console.log(`[EMAIL REMINDER] Hi ${userName}, you have a follow-up reminder for ${reminder.customerName}: "${reminder.title}" scheduled for ${new Date(reminder.scheduledFor).toLocaleString()}`);
+}
+
+async function sendFollowUpWhatsAppNotification({ 
+  reminder, 
+  userEmail, 
+  userName 
+}: { 
+  reminder: any; 
+  userEmail: string; 
+  userName: string; 
+}) {
+  // For now, just log the notification
+  console.log(`[WHATSAPP REMINDER] ${userName}, follow-up reminder: ${reminder.title} for ${reminder.customerName} is due!`);
+}

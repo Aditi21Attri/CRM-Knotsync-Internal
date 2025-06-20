@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,14 +16,16 @@ import { Input } from "@/components/ui/input";
 import { DialogFooter, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import type { Customer } from "@/lib/types";
-import { Loader2, CalendarClock } from "lucide-react";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { FollowUpRemindersPanel } from "@/components/shared/FollowUpRemindersPanel";
+import { Loader2, CalendarClock, Bell } from "lucide-react";
 import { useState, useMemo } from "react";
 import { format, parseISO } from 'date-fns';
 
 const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
-  phoneNumber: z.string().min(5, { message: "Phone number seems too short." }).optional().or(z.literal('')),
+  phoneNumber: z.string().min(5, { message: "Phone number seems to short." }).optional().or(z.literal('')),
   category: z.string().optional().or(z.literal('')),
 }).passthrough(); 
 
@@ -167,8 +168,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                 />
               ))}
             </div>
-          )}
-           <div className="pt-4 space-y-2 text-xs text-muted-foreground">
+          )}           <div className="pt-4 space-y-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
                 <CalendarClock className="h-3.5 w-3.5" />
                 <span>Created: {formatDate(customer.createdAt)}</span>
@@ -177,6 +177,15 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                 <CalendarClock className="h-3.5 w-3.5" />
                 <span>Last Contacted: {formatDate(customer.lastContacted)}</span>
             </div>
+          </div>
+
+          {/* Follow-up Reminders Section */}
+          <div className="pt-4">
+            <h4 className="text-md font-semibold mb-3 text-muted-foreground border-b pb-2 flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Follow-up Reminders
+            </h4>
+            <FollowUpRemindersPanel customerId={customer.id} maxHeight="200px" />
           </div>
         </div>
         

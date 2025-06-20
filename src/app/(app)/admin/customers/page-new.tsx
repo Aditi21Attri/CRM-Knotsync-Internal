@@ -63,9 +63,9 @@ export default function AllCustomersPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-          >            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-              <DialogTrigger asChild>
-                <AnimatedButton variant="default" size="lg" className="glassmorphism bg-gradient-to-r from-primary to-accent text-primary-foreground hover:shadow-lg">
+          >
+            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+              <DialogTrigger asChild>                <AnimatedButton variant="default" size="lg" className="glassmorphism bg-gradient-to-r from-primary to-accent text-primary-foreground hover:shadow-lg">
                   <PlusCircle className="mr-2 h-5 w-5" />
                   Add New Customer
                 </AnimatedButton>

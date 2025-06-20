@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -18,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { Customer, User, CustomerStatus } from "@/lib/types";
-import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag, CalendarDays } from "lucide-react";
+import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag, CalendarDays, Bell } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,6 +29,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CustomerEditForm } from "@/components/shared/CustomerEditForm";
+import { FollowUpReminderDialog } from "@/components/shared/FollowUpReminderDialog";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
@@ -289,15 +289,14 @@ export function CustomerTableAdmin() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      <div className="rounded-lg border shadow-md overflow-x-auto">
-        <Table>
-          <TableCaption>
-            {paginatedCustomers.length > 0 
-              ? `Showing ${((currentPage - 1) * ITEMS_PER_PAGE) + 1} to ${Math.min(currentPage * ITEMS_PER_PAGE, sortedCustomers.length)} of ${sortedCustomers.length} customers.`
-              : "No customers match your current filters."}
-          </TableCaption>
+      </div>      <div className="w-full rounded-lg border shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableCaption>
+              {paginatedCustomers.length > 0 
+                ? `Showing ${((currentPage - 1) * ITEMS_PER_PAGE) + 1} to ${Math.min(currentPage * ITEMS_PER_PAGE, sortedCustomers.length)} of ${sortedCustomers.length} customers.`
+                : "No customers match your current filters."}
+            </TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px] sticky left-0 bg-background z-10">Avatar</TableHead>
@@ -312,7 +311,7 @@ export function CustomerTableAdmin() {
               {allCustomFieldKeys.map(key => (
                   <TableHead key={key} className="whitespace-nowrap">{formatHeaderLabel(key)}</TableHead>
               ))}
-              <TableHead className="text-right w-[100px] sticky right-0 bg-background z-10">Actions</TableHead>
+              <TableHead className="text-right w-[140px] sticky right-0 bg-background z-10">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -377,11 +376,21 @@ export function CustomerTableAdmin() {
                   <TableCell key={key} className="whitespace-nowrap">
                     {String(customer[key] === undefined || customer[key] === null ? 'N/A' : customer[key])}
                   </TableCell>
-                ))}
-                <TableCell className="text-right sticky right-0 bg-background z-10">
+                ))}                <TableCell className="text-right sticky right-0 bg-background z-10">
+                  <div className="flex justify-end gap-1">
+                    <FollowUpReminderDialog 
+                      customerId={customer.id}
+                      customerName={customer.name}
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Schedule follow-up">
+                          <Bell className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} aria-label="Edit customer">
                         <Edit3 className="h-4 w-4" />
                     </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -390,10 +399,10 @@ export function CustomerTableAdmin() {
                 <TableCell colSpan={9 + allCustomFieldKeys.length + 1} className="h-24 text-center">
                   No customers found.
                 </TableCell>
-              </TableRow>
-            )}
+              </TableRow>            )}
           </TableBody>
         </Table>
+        </div>
       </div>
       {totalPages > 1 && (
         <div className="flex items-center justify-end space-x-2 py-4">

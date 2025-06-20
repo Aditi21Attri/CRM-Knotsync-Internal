@@ -1,11 +1,19 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus } from '@/lib/types';
+import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus, FollowUpReminder, FollowUpStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction, deleteAllCustomersAction, handleManualAddCustomerAction, type ManualAddCustomerFormData } from '@/lib/actions/customerActions';
 import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData, deleteEmployeeAction, toggleEmployeeSuspensionAction } from '@/lib/actions/userActions';
+import { 
+  createFollowUpReminder, 
+  getFollowUpReminders, 
+  getFollowUpRemindersByCustomer,
+  updateFollowUpReminderStatus,
+  deleteFollowUpReminder,
+  getDueFollowUpReminders,
+  type CreateFollowUpReminderData 
+} from '@/lib/actions/followUpActions';
 
 interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
 interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password' | 'status'>> {}
@@ -14,9 +22,12 @@ interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password' | 'st
 interface DataContextType {
   customers: Customer[];
   users: User[]; 
-  employees: User[]; 
+  employees: User[];
+  followUpReminders: FollowUpReminder[];
+  dueReminders: FollowUpReminder[];
   addCustomer: (customerData: MappedCustomerData, assignedTo?: string | null, status?: CustomerStatus) => Promise<void>;
   manualAddCustomer: (formData: ManualAddCustomerFormData, currentUserId: string, currentUserRole: UserRole) => Promise<{ success: boolean; customer?: Customer }>;
+
   updateCustomer: (customerId: string, updatedData: Partial<Customer>) => Promise<void>;
   assignCustomer: (customerId: string, employeeId: string | null) => Promise<void>;
   updateCustomerStatus: (customerId: string, status: CustomerStatus, notes?: string) => Promise<void>;
@@ -25,6 +36,12 @@ interface DataContextType {
   updateEmployee: (employeeId: string, updatedData: EmployeeUpdateData) => Promise<void>;
   deleteEmployee: (employeeId: string) => Promise<void>;
   toggleEmployeeSuspension: (employeeId: string) => Promise<void>;
+  // Follow-up reminder functions
+  createFollowUpReminder: (data: CreateFollowUpReminderData) => Promise<void>;
+  getCustomerReminders: (customerId: string) => Promise<FollowUpReminder[]>;
+  updateReminderStatus: (reminderId: string, status: FollowUpStatus) => Promise<void>;
+  deleteReminder: (reminderId: string) => Promise<void>;
+  refreshReminders: () => Promise<void>;
   dataLoading: boolean;
   refreshData: () => Promise<void>;
 }
@@ -35,20 +52,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
+  const [followUpReminders, setFollowUpReminders] = useState<FollowUpReminder[]>([]);
+  const [dueReminders, setDueReminders] = useState<FollowUpReminder[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     setDataLoading(true);
     try {
-      const [fetchedCustomers, fetchedUsers, fetchedEmployees] = await Promise.all([
+      const [fetchedCustomers, fetchedUsers, fetchedEmployees, fetchedFollowUpReminders] = await Promise.all([
         getCustomers(),
         getUsersAction(),
-        getEmployeesAction()
+        getEmployeesAction(),
+        getFollowUpReminders()
       ]);
       setCustomers(fetchedCustomers);
       setUsers(fetchedUsers);
       setEmployees(fetchedEmployees);
+      setFollowUpReminders(fetchedFollowUpReminders);
     } catch (error) {
       console.error("Failed to fetch data:", error);
       toast({
@@ -240,12 +261,66 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Error", description: `Failed to toggle suspension: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
     }
   };
+  const createFollowUpReminderFunc = async (data: CreateFollowUpReminderData) => {
+    try {
+      const newReminder = await createFollowUpReminder(data);
+      setFollowUpReminders(prev => [...prev, newReminder]);
+      toast({ title: "Reminder Created", description: "The follow-up reminder has been created." });
+      refreshReminders();
+    } catch (error) {
+      console.error("Failed to create follow-up reminder:", error);
+      toast({ title: "Error", description: `Failed to create reminder: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+  const getCustomerReminders = async (customerId: string) => {
+    try {
+      return await getFollowUpRemindersByCustomer(customerId);
+    } catch (error) {
+      console.error("Failed to fetch customer reminders:", error);
+      toast({ title: "Error", description: "Failed to load reminders for this customer.", variant: "destructive" });
+      return [];
+    }
+  };
+
+  const updateReminderStatus = async (reminderId: string, status: FollowUpStatus) => {
+    try {
+      await updateFollowUpReminderStatus(reminderId, status);
+      setFollowUpReminders(prev => prev.map(r => r.id === reminderId ? { ...r, status } : r));
+      toast({ title: "Reminder Status Updated", description: "The status of the reminder has been updated." });
+    } catch (error) {
+      console.error("Failed to update reminder status:", error);
+      toast({ title: "Error", description: `Failed to update reminder status: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+
+  const deleteReminder = async (reminderId: string) => {
+    try {
+      await deleteFollowUpReminder(reminderId);
+      setFollowUpReminders(prev => prev.filter(r => r.id !== reminderId));
+      toast({ title: "Reminder Deleted", description: "The follow-up reminder has been deleted." });
+    } catch (error) {
+      console.error("Failed to delete reminder:", error);
+      toast({ title: "Error", description: `Failed to delete reminder: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+
+  const refreshReminders = async () => {
+    try {
+      const reminders = await getDueFollowUpReminders();
+      setDueReminders(reminders);
+    } catch (error) {
+      console.error("Failed to fetch due reminders:", error);
+      toast({ title: "Error", description: "Failed to load due reminders.", variant: "destructive" });
+    }
+  };
 
   return (
     <DataContext.Provider value={{ 
       customers, 
       users, 
       employees, 
+      followUpReminders,
+      dueReminders,
       addCustomer, 
       manualAddCustomer,
       updateCustomer,
@@ -256,6 +331,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateEmployee,
       deleteEmployee,
       toggleEmployeeSuspension,
+      createFollowUpReminder: createFollowUpReminderFunc,
+      getCustomerReminders,
+      updateReminderStatus,
+      deleteReminder,
+      refreshReminders,
       dataLoading,
       refreshData: fetchData,
     }}>

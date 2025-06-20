@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect }  from 'react';
@@ -8,12 +7,16 @@ import { SidebarContents } from "@/components/layout/SidebarContents";
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFollowUpNotifications } from '@/hooks/useFollowUpNotifications';
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { currentUser, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Initialize follow-up notifications
+  useFollowUpNotifications();
 
   useEffect(() => {
     if (!isLoading) {
@@ -43,21 +46,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
   return (
     <SidebarProvider defaultOpen>
-      <div className="flex min-h-screen w-full">
-        <Sidebar collapsible="icon" className="border-r">
+      <div className="flex min-h-screen w-full bg-background">
+        <Sidebar collapsible="icon" className="border-r border-sidebar-border">
           <SidebarContents />
         </Sidebar>
-        <div className="flex flex-col flex-1">
+        <SidebarInset className="flex-1 flex flex-col min-w-0">
           <Header />
-          <SidebarInset className="flex-1 overflow-y-auto">
-             <main className="p-4 md:p-6 lg:p-8">
-              {children}
-            </main>
-          </SidebarInset>
-        </div>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+            {children}
+          </main>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );

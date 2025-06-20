@@ -51,6 +51,27 @@ export interface MappedCustomerData extends Omit<Customer, 'id' | 'status' | 'as
 }
 
 export type LeadSource = 'website' | 'instagram' | 'facebook' | 'google' | 'linkedin' | 'other';
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'on_hold' | 'rejected' | 'deleted';
+
+// Follow-up reminder types
+export type FollowUpStatus = 'pending' | 'completed' | 'overdue' | 'cancelled';
+
+export interface FollowUpReminder {
+  id: string;
+  customerId: string;
+  customerName: string;
+  createdBy: string; // User ID who created the reminder
+  createdByName: string;
+  title: string;
+  description?: string;
+  scheduledFor: string; // ISO date string
+  status: FollowUpStatus;
+  createdAt: string; // ISO date string
+  updatedAt?: string; // ISO date string
+  completedAt?: string; // ISO date string when marked as completed
+  notificationSent?: boolean;
+  priority?: 'low' | 'medium' | 'high';
+}
 
 export interface Lead {
   id: string;
@@ -66,8 +87,10 @@ export interface Lead {
     name: string;
     email: string;
   } | null;
-  status?: string;
+  status?: LeadStatus;
   notes?: string;
   expectedRevenue?: string;
+  convertedAt?: string; // ISO date string when converted to customer
+  convertedToCustomerId?: string; // Customer ID if converted
 }
 
