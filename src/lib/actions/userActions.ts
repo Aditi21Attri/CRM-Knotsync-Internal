@@ -1,4 +1,3 @@
-
 'use server';
 
 import { connectToDatabase } from '@/lib/mongodb';
@@ -78,6 +77,20 @@ export async function getEmployees(): Promise<User[]> {
   }
 }
 
+export async function getAllEmployees(): Promise<User[]> {
+  const db = await connectToDatabase();
+  const usersCollection = db.collection<Omit<User, 'id'>>('users');
+  const employees = await usersCollection.find({ role: 'employee' }).toArray();
+  return employees.map(emp => ({
+    id: emp._id.toString(),
+    name: emp.name,
+    email: emp.email,
+    role: emp.role,
+    status: emp.status,
+    avatarUrl: emp.avatarUrl,
+    specializedRegion: emp.specializedRegion,
+  }));
+}
 
 export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>> & Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password' | 'status'>>): Promise<User> {
   try {

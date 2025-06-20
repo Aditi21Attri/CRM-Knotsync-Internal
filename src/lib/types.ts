@@ -1,4 +1,3 @@
-
 export type UserRole = 'admin' | 'employee';
 export type UserStatus = 'active' | 'suspended';
 
@@ -49,5 +48,26 @@ export interface ExcelRowData {
 // It's essentially what a new Customer object would look like before ID, status, assignment.
 export interface MappedCustomerData extends Omit<Customer, 'id' | 'status' | 'assignedTo' | 'lastContacted' | 'createdAt' | 'notes'> {
   // Fields are dynamically determined by Excel import and mapping
+}
+
+export type LeadSource = 'website' | 'instagram' | 'facebook' | 'google' | 'linkedin' | 'other';
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  message?: string;
+  source: LeadSource;
+  createdAt: string; // ISO date string
+  meta?: any; // For extra data from ad platforms
+  assignedTo?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  status?: string;
+  notes?: string;
+  expectedRevenue?: string;
 }
 
