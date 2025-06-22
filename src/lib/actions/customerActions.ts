@@ -1,14 +1,12 @@
-
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase, getObjectId } from '@/lib/mongodb-server';
 import type { Customer, MappedCustomerData, CustomerStatus, UserRole } from '@/lib/types';
-import { ObjectId } from 'mongodb';
 
 export async function getCustomers(): Promise<Customer[]> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     const customersFromDb = await customersCollection.find({}).sort({ createdAt: -1 }).toArray(); // Sort by createdAt descending
     return customersFromDb.map(customerDoc => {
       const { _id, ...restOfDoc } = customerDoc;
@@ -30,7 +28,7 @@ export async function addCustomerAction(
 ): Promise<Customer> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     
     const now = new Date().toISOString();
     const newCustomerDbData: Omit<Customer, 'id' | 'createdAt'> & { createdAt: string } = {
@@ -86,7 +84,7 @@ export async function handleManualAddCustomerAction(
 ): Promise<{ status: 'created' | 'duplicate_updated' | 'error'; customer?: Customer; message?: string }> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     const now = new Date().toISOString();
 
     const normalizedEmail = formData.email.toLowerCase();
@@ -147,7 +145,7 @@ export async function handleManualAddCustomerAction(
 export async function updateCustomerAction(customerId: string, updatedCustomerData: Partial<Omit<Customer, 'id' | 'createdAt'>>): Promise<Customer | null> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     
     // Ensure email is lowercased if present in update
     const updatePayload = { ...updatedCustomerData };
@@ -164,7 +162,7 @@ export async function updateCustomerAction(customerId: string, updatedCustomerDa
     const { createdAt, ...setData } = updatePayload;
 
     const result = await customersCollection.findOneAndUpdate(
-      { _id: new ObjectId(customerId) },
+      { _id: new (await getObjectId())(customerId) },
       { $set: setData },
       { returnDocument: 'after' }
     );
@@ -184,9 +182,9 @@ export async function updateCustomerAction(customerId: string, updatedCustomerDa
 export async function assignCustomerAction(customerId: string, employeeId: string | null): Promise<Customer | null> {
    try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     const result = await customersCollection.findOneAndUpdate(
-      { _id: new ObjectId(customerId) },
+      { _id: new (await getObjectId())(customerId) },
       { $set: { assignedTo: employeeId, lastContacted: new Date().toISOString() } },
       { returnDocument: 'after' }
     );
@@ -205,9 +203,9 @@ export async function assignCustomerAction(customerId: string, employeeId: strin
 export async function updateCustomerStatusAction(customerId: string, status: CustomerStatus, notes?: string): Promise<Customer | null> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     
-    const customerDoc = await customersCollection.findOne({ _id: new ObjectId(customerId) });
+    const customerDoc = await customersCollection.findOne({ _id: new (await getObjectId())(customerId) });
     if (!customerDoc) return null; 
 
     const updatePayload: Partial<Omit<Customer, 'id' | 'createdAt'>> = { 
@@ -223,7 +221,7 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
     }
     
     const result = await customersCollection.findOneAndUpdate(
-      { _id: new ObjectId(customerId) },
+      { _id: new (await getObjectId())(customerId) },
       { $set: updatePayload },
       { returnDocument: 'after' }
     );
@@ -243,7 +241,7 @@ export async function updateCustomerStatusAction(customerId: string, status: Cus
 export async function unassignCustomersByEmployeeId(employeeId: string): Promise<{ success: boolean; modifiedCount: number }> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     
     const result = await customersCollection.updateMany(
       { assignedTo: employeeId },
@@ -260,12 +258,31 @@ export async function unassignCustomersByEmployeeId(employeeId: string): Promise
 export async function deleteAllCustomersAction(): Promise<{ success: boolean; deletedCount: number }> {
   try {
     const db = await connectToDatabase();
-    const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
+    const customersCollection = db.collection('customers');
     const result = await customersCollection.deleteMany({}); 
     return { success: true, deletedCount: result.deletedCount };
   } catch (error) {
     console.error('Failed to delete all customers:', error);
     throw new Error(`Failed to delete all customers. Details: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export async function deleteCustomerAction(customerId: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const db = await connectToDatabase();
+    const customersCollection = db.collection('customers');
+    
+    const result = await customersCollection.deleteOne({ _id: new (await getObjectId())(customerId) });
+    
+    if (result.deletedCount === 0) {
+      return { success: false, message: 'Customer not found.' };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete customer:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, message: `Failed to delete customer. Details: ${errorMessage}` };
   }
 }
 

@@ -5,7 +5,7 @@ import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { authenticateUser, createInitialAdminAction } from '@/lib/actions/userActions'; 
+import { authenticateUserAPIAPI, createInitialAdminAPI } from '@/lib/api-client';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const user = await authenticateUser(email, password);
+      const user = await authenticateUserAPI(email, password);
 
       if (user && user.status === 'active') {
         setCurrentUser(user);
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createInitialAdmin = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const result = await createInitialAdminAction({ name, email, password });
+      const result = await createInitialAdminAPI({ name, email, password });
       if (result.success && result.user) {
         toast({
           title: "Admin Account Created",

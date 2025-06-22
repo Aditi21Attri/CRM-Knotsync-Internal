@@ -54,6 +54,15 @@ export function SidebarContents() {
   };
 
   const filteredNavItems = navItems.filter(item => item.roles.includes(currentUser.role));
+  
+  // Separate core CRM and immigration items
+  const coreNavItems = filteredNavItems.filter(item => 
+    !item.href.startsWith('/immigration')
+  );
+  
+  const immigrationNavItems = filteredNavItems.filter(item => 
+    item.href.startsWith('/immigration')
+  );
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -118,15 +127,13 @@ export function SidebarContents() {
                 </span>
               )}
             </div>
-          </motion.div>
-
-          {/* Navigation */}
+          </motion.div>          {/* Core CRM Navigation */}
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/60 font-medium mb-2">
-              Navigation
+              Core CRM
             </SidebarGroupLabel>
             <SidebarMenu>
-              {filteredNavItems.map((item, index) => {
+              {coreNavItems.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 const showBadge = item.badge && (pendingCount > 0 || overdueCount > 0);
@@ -192,6 +199,62 @@ export function SidebarContents() {
               })}
             </SidebarMenu>
           </SidebarGroup>
+
+          {/* Immigration Services Navigation */}
+          {immigrationNavItems.length > 0 && (
+            <SidebarGroup className="mt-6">
+              <SidebarGroupLabel className="text-sidebar-foreground/60 font-medium mb-2">
+                Immigration Services
+              </SidebarGroupLabel>
+              <SidebarMenu>
+                {immigrationNavItems.map((item, index) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+
+                  return (
+                    <motion.div key={item.href} variants={itemVariants}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          className={cn(
+                            'group relative transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                            isActive && 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
+                          )}
+                        >
+                          <Link href={item.href} className="flex items-center gap-3">
+                            <motion.div
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={cn(
+                                'transition-colors duration-200',
+                                isActive 
+                                  ? 'text-sidebar-primary-foreground' 
+                                  : 'text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground'
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </motion.div>
+                              {sidebarState !== 'collapsed' && (
+                              <span className="truncate">{item.label}</span>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                        
+                        {/* Active Indicator */}
+                        {isActive && (
+                          <motion.div
+                            layoutId="activeIndicator"
+                            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary-foreground"
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                          />
+                        )}
+                      </SidebarMenuItem>
+                    </motion.div>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          )}
 
           {/* Quick Actions */}
           <motion.div

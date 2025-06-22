@@ -4,10 +4,14 @@
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from './ThemeToggle';
 import { UserNav } from './UserNav';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header() {
+  const { currentUser } = useAuth();
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -10 }}
@@ -54,13 +58,18 @@ export function Header() {
             </Link>
           </motion.div>
         </div>
-        
-        <motion.div 
+          <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3, delay: 0.2 }}
           className="flex items-center gap-x-2 sm:gap-x-4"
         >
+          {currentUser && (
+            <NotificationCenter 
+              userId={currentUser.id} 
+              userName={currentUser.name} 
+            />
+          )}
           <ThemeToggle />
           <UserNav />
         </motion.div>

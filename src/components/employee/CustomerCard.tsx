@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3, Clock, Bell } from "lucide-react";
+import { Mail, Phone, Tag, Edit2, Save, MessageSquare, CalendarDays, Edit3, Clock, Bell, MessageCircle } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { CustomerEditForm } from '@/components/shared/CustomerEditForm';
 import { FollowUpReminderDialog } from '@/components/shared/FollowUpReminderDialog';
+import { communicationUtils } from '@/lib/communication';
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-100 text-green-800 border-green-300 dark:bg-green-800/30 dark:text-green-300 dark:border-green-700",
@@ -27,6 +29,7 @@ interface CustomerCardProps {
 
 export function CustomerCard({ customer }: CustomerCardProps) {
   const { updateCustomerStatus } = useData();
+  const { toast } = useToast();
   const [newStatus, setNewStatus] = useState<CustomerStatus>(customer.status);
   const [newNote, setNewNote] = useState('');
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -66,36 +69,76 @@ export function CustomerCard({ customer }: CustomerCardProps) {
      if (!date) return 'N/A';
      return formatDistanceToNow(date, { addSuffix: true });
   }
+  const handleSendEmail = () => {
+    communicationUtils.sendEmail(customer, toast);
+  };
+
+  const handleWhatsApp = () => {
+    communicationUtils.sendWhatsApp(customer, toast);
+  };
+
+  const handleCall = () => {
+    communicationUtils.makeCall(customer, toast);
+  };
 
   return (
-    <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
-      <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-3">
-        <Avatar className="h-12 w-12 border-2 border-primary/50">
-          <AvatarImage src={`https://placehold.co/80x80/E5EAF7/2962FF?text=${getInitials(customer.name)}`} alt={customer.name} data-ai-hint="customer avatar" />
-          <AvatarFallback>{getInitials(customer.name)}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <CardTitle className="font-headline text-xl text-primary">{customer.name}</CardTitle>
-          <CardDescription className="flex items-center text-sm text-muted-foreground">
-            <Badge variant="outline" className={`capitalize ${statusColors[customer.status]} mr-2`}>{customer.status}</Badge>
+    <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">      <CardHeader className="flex-row items-start justify-between space-y-0 pb-3">
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={`https://placehold.co/40x40/e0e7ff/3730a3?text=${getInitials(customer.name)}`} alt={customer.name} />
+            <AvatarFallback>{getInitials(customer.name)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base truncate">{customer.name}</CardTitle>
+            <Badge className={`capitalize ${statusColors[customer.status]} mr-2`}>{customer.status}</Badge>
             {customer.category && <><Tag className="h-3 w-3 mr-1" /> {customer.category}</>}
-          </CardDescription>
+          </div>
         </div>
-        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => setIsEditModalOpen(isOpen)}>
+        <div className="flex items-center gap-1 shrink-0">          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleSendEmail}
+            title="Send Email"
+            className="h-8 w-8 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/20"
+          >
+            <Mail className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleWhatsApp}
+            title="Send WhatsApp"
+            className="h-8 w-8 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/20"
+            disabled={!customer.phoneNumber}
+          >
+            <MessageCircle className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCall}
+            title="Call Customer"
+            className="h-8 w-8 hover:bg-purple-100 hover:text-purple-600 dark:hover:bg-purple-900/20"
+            disabled={!customer.phoneNumber}
+          >
+            <Phone className="h-4 w-4" />
+          </Button>
+          <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => setIsEditModalOpen(isOpen)}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit customer details">
-                    <Edit3 className="h-4 w-4" />
-                </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit customer details">
+                <Edit3 className="h-4 w-4" />
+              </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[525px] p-0">
-                {isEditModalOpen && (
-                     <CustomerEditForm 
-                        customer={customer} 
-                        onFormSubmit={() => setIsEditModalOpen(false)} 
-                    />
-                )}
+              {isEditModalOpen && (
+                <CustomerEditForm 
+                  customer={customer} 
+                  onFormSubmit={() => setIsEditModalOpen(false)} 
+                />
+              )}
             </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm flex-grow">
         <div className="flex items-center text-foreground">

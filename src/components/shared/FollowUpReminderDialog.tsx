@@ -63,7 +63,7 @@ export function FollowUpReminderDialog({ customerId, customerName, trigger }: Fo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState("");
-    const { createFollowUpReminder } = useData();
+    const { createFollowUpReminderAPI } = useData();
   const { currentUser } = useAuth();
 
   const form = useForm<FollowUpFormValues>({
@@ -97,7 +97,7 @@ export function FollowUpReminderDialog({ customerId, customerName, trigger }: Fo
     
     setIsSubmitting(true);
     try {
-      await createFollowUpReminder({
+      await createFollowUpReminderAPI({
         customerId,
         customerName,
         createdBy: currentUser.id,

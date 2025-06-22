@@ -1,8 +1,7 @@
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase, getObjectId } from '@/lib/mongodb-server';
 import type { Lead, LeadSource, LeadStatus, Customer, CustomerStatus } from '@/lib/types';
-import { ObjectId } from 'mongodb';
 import { sendLeadNotification } from '@/lib/notifications';
 import { getAllEmployees } from './userActions';
 
@@ -37,20 +36,41 @@ export interface AddLeadData {
 }
 
 export async function addLeadAction(data: AddLeadData): Promise<Lead> {
+  console.log(`📝 Adding new lead: ${data.name} from ${data.source}`);
+  
   const db = await connectToDatabase();
   const leadsCollection = db.collection<Omit<Lead, 'id'>>('leads');
   const now = new Date().toISOString();
   let assignedTo = data.assignedTo;
+  
   if (!assignedTo) {
     assignedTo = await getNextEmployeeRoundRobin();
+    console.log(`🎯 Auto-assigned lead to: ${assignedTo?.name || 'No one (no employees available)'}`);
+  } else {
+    console.log(`👤 Lead manually assigned to: ${assignedTo.name}`);
   }
+  
   const newLead = { ...data, createdAt: now, assignedTo };
   const result = await leadsCollection.insertOne(newLead);
+  
   if (!result.insertedId) throw new Error('Failed to insert lead');
+  
   const insertedDoc = await leadsCollection.findOne({ _id: result.insertedId });
   if (!insertedDoc) throw new Error('Failed to fetch inserted lead');
+  
   const { _id, ...rest } = insertedDoc;
-  await sendLeadNotification({ name: newLead.name, email: newLead.email, phoneNumber: newLead.phoneNumber, source: newLead.source, assignedTo: assignedTo || undefined });
+  
+  // Send notifications
+  console.log(`📧 Sending lead notifications for: ${newLead.name}`);
+  await sendLeadNotification({ 
+    name: newLead.name, 
+    email: newLead.email, 
+    phoneNumber: newLead.phoneNumber, 
+    source: newLead.source, 
+    assignedTo: assignedTo || undefined 
+  });
+  
+  console.log(`✅ Lead ${newLead.name} added successfully with ID: ${_id.toString()}`);
   return { id: _id.toString(), ...rest } as Lead;
 }
 
@@ -66,10 +86,9 @@ export async function getLeadsAssignedTo(userId: string): Promise<Lead[]> {
 
 export async function updateLeadDetails(leadId: string, updates: { status?: string; notes?: string; expectedRevenue?: string }): Promise<Lead | null> {
   const db = await connectToDatabase();
-  const leadsCollection = db.collection<Omit<Lead, 'id'>>('leads');
-  const updatePayload: any = { ...updates };
+  const leadsCollection = db.collection<Omit<Lead, 'id'>>('leads');  const updatePayload: any = { ...updates };
   const result = await leadsCollection.findOneAndUpdate(
-    { _id: new ObjectId(leadId) },
+    { _id: new (await getObjectId())(leadId) },
     { $set: updatePayload },
     { returnDocument: 'after' }
   );
@@ -86,7 +105,7 @@ export async function convertLeadToCustomer(leadId: string, assignedEmployeeId?:
     const customersCollection = db.collection<Omit<Customer, 'id'>>('customers');
     
     // Get the lead
-    const lead = await leadsCollection.findOne({ _id: new ObjectId(leadId) });
+    const lead = await leadsCollection.findOne({ _id: new (await getObjectId())(leadId) });
     if (!lead) {
       return { success: false, error: 'Lead not found' };
     }
@@ -115,10 +134,9 @@ export async function convertLeadToCustomer(leadId: string, assignedEmployeeId?:
     if (!customerResult.insertedId) {
       return { success: false, error: 'Failed to create customer' };
     }
-    
-    // Update lead status
+      // Update lead status
     await leadsCollection.updateOne(
-      { _id: new ObjectId(leadId) },
+      { _id: new (await getObjectId())(leadId) },
       { 
         $set: { 
           status: 'converted' as LeadStatus,
@@ -153,10 +171,9 @@ export async function updateLeadStatus(leadId: string, status: LeadStatus, notes
     const updateData: any = { status };
     if (notes) {
       updateData.notes = notes;
-    }
-    
+    }    
     const result = await leadsCollection.findOneAndUpdate(
-      { _id: new ObjectId(leadId) },
+      { _id: new (await getObjectId())(leadId) },
       { $set: updateData },
       { returnDocument: 'after' }
     );
@@ -182,7 +199,7 @@ export async function deleteLeadSoft(leadId: string): Promise<{ success: boolean
     const leadsCollection = db.collection<Omit<Lead, 'id'>>('leads');
     
     const result = await leadsCollection.updateOne(
-      { _id: new ObjectId(leadId) },
+      { _id: new (await getObjectId())(leadId) },
       { $set: { status: 'deleted' as LeadStatus } }
     );
     
@@ -203,7 +220,7 @@ export async function deleteLeadHard(leadId: string): Promise<{ success: boolean
     const db = await connectToDatabase();
     const leadsCollection = db.collection<Omit<Lead, 'id'>>('leads');
     
-    const result = await leadsCollection.deleteOne({ _id: new ObjectId(leadId) });
+    const result = await leadsCollection.deleteOne({ _id: new (await getObjectId())(leadId) });
     
     if (result.deletedCount === 0) {
       return { success: false, error: 'Lead not found' };

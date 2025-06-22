@@ -1,8 +1,7 @@
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase, getObjectId } from '@/lib/mongodb-server';
 import type { User, UserRole, UserStatus } from '@/lib/types';
-import { ObjectId } from 'mongodb';
 import { unassignCustomersByEmployeeId } from './customerActions';
 import crypto from 'crypto';
 
@@ -26,7 +25,7 @@ interface CreateInitialAdminArgs {
 export async function getUsers(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     const usersFromDb = await usersCollection.find({}).toArray();
     
     return usersFromDb.map(userDoc => {
@@ -53,7 +52,7 @@ export async function getUsers(): Promise<User[]> {
 export async function getEmployees(): Promise<User[]> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     const employeesFromDb = await usersCollection.find({ role: 'employee' }).toArray();
 
     return employeesFromDb.map(empDoc => {
@@ -79,7 +78,7 @@ export async function getEmployees(): Promise<User[]> {
 
 export async function getAllEmployees(): Promise<User[]> {
   const db = await connectToDatabase();
-  const usersCollection = db.collection<Omit<User, 'id'>>('users');
+  const usersCollection = db.collection('users');
   const employees = await usersCollection.find({ role: 'employee' }).toArray();
   return employees.map(emp => ({
     id: emp._id.toString(),
@@ -95,7 +94,7 @@ export async function getAllEmployees(): Promise<User[]> {
 export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>> & Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password' | 'status'>>): Promise<User> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
 
     const existingUser = await usersCollection.findOne({ email: employeeData.email.toLowerCase() });
     if (existingUser) {
@@ -146,7 +145,7 @@ export async function addEmployeeAction(employeeData: Required<Pick<EmployeeData
 export async function updateEmployeeAction(employeeId: string, updatedData: Partial<Omit<EmployeeData, 'password' | 'status'>>): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     
     const updatePayload: Partial<Omit<User, 'id' | 'password' | 'status'>> = { ...updatedData };
     if (updatedData.email) {
@@ -157,7 +156,7 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
     }
     
     const result = await usersCollection.findOneAndUpdate(
-      { _id: new ObjectId(employeeId) },
+      { _id: new (await getObjectId())(employeeId) },
       { $set: updatePayload },
       { returnDocument: 'after' }
     );
@@ -190,11 +189,11 @@ export async function updateEmployeeAction(employeeId: string, updatedData: Part
 export async function deleteEmployeeAction(employeeId: string): Promise<{ success: boolean; message?: string }> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     
     await unassignCustomersByEmployeeId(employeeId);
 
-    const result = await usersCollection.deleteOne({ _id: new ObjectId(employeeId) });
+    const result = await usersCollection.deleteOne({ _id: new (await getObjectId())(employeeId) });
 
     if (result.deletedCount === 0) {
       return { success: false, message: 'Employee not found.' };
@@ -210,9 +209,9 @@ export async function deleteEmployeeAction(employeeId: string): Promise<{ succes
 export async function toggleEmployeeSuspensionAction(employeeId: string): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
 
-    const employee = await usersCollection.findOne({ _id: new ObjectId(employeeId) });
+    const employee = await usersCollection.findOne({ _id: new (await getObjectId())(employeeId) });
     if (!employee) {
       return null;
     }
@@ -220,7 +219,7 @@ export async function toggleEmployeeSuspensionAction(employeeId: string): Promis
     const newStatus: UserStatus = employee.status === 'active' ? 'suspended' : 'active';
 
     const result = await usersCollection.findOneAndUpdate(
-      { _id: new ObjectId(employeeId) },
+      { _id: new (await getObjectId())(employeeId) },
       { $set: { status: newStatus } },
       { returnDocument: 'after' }
     );
@@ -250,7 +249,7 @@ export async function toggleEmployeeSuspensionAction(employeeId: string): Promis
 export async function authenticateUser(email: string, passwordAttempt: string): Promise<User | null> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     
     const userDoc = await usersCollection.findOne({ email: email.toLowerCase() });
 
@@ -294,7 +293,7 @@ export async function authenticateUser(email: string, passwordAttempt: string): 
 export async function requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     const user = await usersCollection.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -323,7 +322,7 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
 export async function verifyTokenForPasswordReset(token: string): Promise<{ isValid: boolean; message?: string; email?: string }> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     const user = await usersCollection.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: new Date() },
@@ -343,7 +342,7 @@ export async function verifyTokenForPasswordReset(token: string): Promise<{ isVa
 export async function resetPassword(token: string, newPasswordValue: string): Promise<{ success: boolean; message: string }> {
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
     
     const user = await usersCollection.findOne({
       resetPasswordToken: token,
@@ -378,7 +377,7 @@ export async function createInitialAdminAction(
   }
   try {
     const db = await connectToDatabase();
-    const usersCollection = db.collection<Omit<User, 'id'>>('users');
+    const usersCollection = db.collection('users');
 
     // Check if any admin user already exists
     const existingAdmin = await usersCollection.findOne({ role: 'admin' });

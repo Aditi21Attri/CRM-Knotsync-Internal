@@ -1,6 +1,10 @@
 import type { UserRole } from "./types";
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Users, UserPlus, FileInput, BarChart3, Briefcase, UserCheck, Settings, Bell } from "lucide-react";
+import { 
+  LayoutDashboard, Users, UserPlus, FileInput, BarChart3, Briefcase, 
+  UserCheck, Settings, Bell, Globe, Shield, Newspaper, DollarSign, 
+  Target, CreditCard, User 
+} from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -33,13 +37,19 @@ export const navItems: NavItem[] = [
     icon: Briefcase,
     roles: ["admin"],
     tooltip: "Customers"
-  },
-  {
+  },  {
     href: "/admin/import",
     label: "Import Data",
     icon: FileInput,
     roles: ["admin"],
     tooltip: "Import"
+  },
+  {
+    href: "/admin/data-seeding",
+    label: "Seed Sample Data",
+    icon: BarChart3,
+    roles: ["admin"],
+    tooltip: "Seed Data"
   },
   {
     href: "/admin/performance",
@@ -88,7 +98,49 @@ export const navItems: NavItem[] = [
     label: "My Follow-ups",
     icon: Bell,
     roles: ["employee"],
-    tooltip: "Follow-ups"
+    tooltip: "Follow-ups"  },
+  // Immigration Services Section
+  {
+    href: "/immigration",
+    label: "Immigration Hub",
+    icon: Globe,
+    roles: ["admin", "employee"],
+    tooltip: "Immigration Services"
+  },
+  {
+    href: "/immigration/compliance",
+    label: "Compliance Monitor",
+    icon: Shield,
+    roles: ["admin", "employee"],
+    tooltip: "Compliance"
+  },
+  {
+    href: "/immigration/news",
+    label: "Immigration News",
+    icon: Newspaper,
+    roles: ["admin", "employee"],
+    tooltip: "News & Updates"
+  },
+  {
+    href: "/immigration/analytics",
+    label: "Revenue Analytics",
+    icon: DollarSign,
+    roles: ["admin"],
+    tooltip: "Revenue Analytics"
+  },
+  {
+    href: "/immigration/leads",
+    label: "Lead Scoring",
+    icon: Target,
+    roles: ["admin", "employee"],
+    tooltip: "Lead Scoring"
+  },
+  {
+    href: "/immigration/portal",
+    label: "Client Portal",
+    icon: User,
+    roles: ["admin", "employee"],
+    tooltip: "Client Portal"
   },
   // Example of a group with sub-items (if needed later)
   // {

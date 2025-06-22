@@ -3,17 +3,30 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { Customer, User, MappedCustomerData, CustomerStatus, UserRole, UserStatus, FollowUpReminder, FollowUpStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getCustomers, addCustomerAction, updateCustomerAction, assignCustomerAction, updateCustomerStatusAction, deleteAllCustomersAction, handleManualAddCustomerAction, type ManualAddCustomerFormData } from '@/lib/actions/customerActions';
-import { getUsers as getUsersAction, getEmployees as getEmployeesAction, addEmployeeAction, updateEmployeeAction, type EmployeeData, deleteEmployeeAction, toggleEmployeeSuspensionAction } from '@/lib/actions/userActions';
 import { 
-  createFollowUpReminder, 
-  getFollowUpReminders, 
-  getFollowUpRemindersByCustomer,
-  updateFollowUpReminderStatus,
-  deleteFollowUpReminder,
-  getDueFollowUpReminders,
-  type CreateFollowUpReminderData 
-} from '@/lib/actions/followUpActions';
+  getCustomersAPI, 
+  addCustomerAPI, 
+  updateCustomerAPI, 
+  assignCustomerAPI, 
+  updateCustomerStatusAPI, 
+  deleteAllCustomersAPI, 
+  handleManualAddCustomerAPI,
+  getUsersAPI,
+  getEmployeesAPI,
+  addEmployeeAPI,
+  updateEmployeeAPI,
+  deleteEmployeeAPI,
+  toggleEmployeeSuspensionAPI,
+  createFollowUpReminderAPI,
+  getFollowUpRemindersAPI,
+  getFollowUpRemindersByCustomerAPI,
+  updateFollowUpReminderStatusAPI,
+  deleteFollowUpReminderAPI,
+  getDueFollowUpRemindersAPI,
+  type EmployeeData,
+  type ManualAddCustomerFormData,
+  type CreateFollowUpReminderData
+} from '@/lib/api-client';
 
 interface EmployeeCreationData extends Required<Pick<EmployeeData, 'name' | 'email' | 'role' | 'password'>>, Partial<Omit<EmployeeData, 'name' | 'email' | 'role' | 'password'>> {}
 interface EmployeeUpdateData extends Partial<Omit<EmployeeData, 'password' | 'status'>> {}
@@ -37,7 +50,7 @@ interface DataContextType {
   deleteEmployee: (employeeId: string) => Promise<void>;
   toggleEmployeeSuspension: (employeeId: string) => Promise<void>;
   // Follow-up reminder functions
-  createFollowUpReminder: (data: CreateFollowUpReminderData) => Promise<void>;
+  createFollowUpReminderAPI: (data: CreateFollowUpReminderData) => Promise<void>;
   getCustomerReminders: (customerId: string) => Promise<FollowUpReminder[]>;
   updateReminderStatus: (reminderId: string, status: FollowUpStatus) => Promise<void>;
   deleteReminder: (reminderId: string) => Promise<void>;
@@ -55,23 +68,30 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [followUpReminders, setFollowUpReminders] = useState<FollowUpReminder[]>([]);
   const [dueReminders, setDueReminders] = useState<FollowUpReminder[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-  const { toast } = useToast();
-
-  const fetchData = useCallback(async () => {
+  const { toast } = useToast();  const fetchData = useCallback(async () => {
+    console.log('🔄 [DataContext] Starting to fetch data...');
     setDataLoading(true);
     try {
       const [fetchedCustomers, fetchedUsers, fetchedEmployees, fetchedFollowUpReminders] = await Promise.all([
-        getCustomers(),
-        getUsersAction(),
-        getEmployeesAction(),
-        getFollowUpReminders()
+        getCustomersAPI(),
+        getUsersAPI(),
+        getEmployeesAPI(),
+        getFollowUpRemindersAPI()
       ]);
+      
+      console.log('✅ [DataContext] Fetched data:', {
+        customers: fetchedCustomers.length,
+        users: fetchedUsers.length,
+        employees: fetchedEmployees.length,
+        reminders: fetchedFollowUpReminders.length
+      });
+      
       setCustomers(fetchedCustomers);
       setUsers(fetchedUsers);
       setEmployees(fetchedEmployees);
       setFollowUpReminders(fetchedFollowUpReminders);
     } catch (error) {
-      console.error("Failed to fetch data:", error);
+      console.error("❌ [DataContext] Failed to fetch data:", error);
       toast({
         title: "Error Loading Data",
         description: "Could not load data from the server. Please try again later.",
@@ -79,38 +99,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       });
     } finally {
       setDataLoading(false);
+      console.log('✅ [DataContext] Data loading complete');
     }
   }, [toast]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
   const addCustomer = async (customerData: MappedCustomerData, assignedTo: string | null = null, status: CustomerStatus = 'neutral') => {
     try {
-      const newCustomer = await addCustomerAction(customerData, assignedTo, status);
+      const newCustomer = await addCustomerAPI({ ...customerData, assignedTo, status });
       setCustomers(prev => [newCustomer, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       console.error("Failed to add customer (CSV):", error);
       toast({ title: "Error", description: "Failed to add customer from CSV.", variant: "destructive" });
     }
   };
-
   const manualAddCustomer = async (formData: ManualAddCustomerFormData, currentUserId: string, currentUserRole: UserRole): Promise<{ success: boolean; customer?: Customer }> => {
     try {
-      const result = await handleManualAddCustomerAction(formData, currentUserId, currentUserRole);
-      if (result.status === 'created' && result.customer) {
-        setCustomers(prev => [result.customer!, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        toast({ title: "Customer Added", description: `${result.customer.name} has been successfully added.` });
-        return { success: true, customer: result.customer };
-      } else if (result.status === 'duplicate_updated' && result.customer) {
-        setCustomers(prev => prev.map(c => c.id === result.customer!.id ? result.customer! : c).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        toast({ title: "Customer Exists", description: `A customer with this email or phone already exists. ${result.customer.name}'s contact time has been updated.` });
-        return { success: true, customer: result.customer };
-      } else {
-        toast({ title: "Error", description: result.message || "Failed to add customer.", variant: "destructive" });
-        return { success: false };
-      }
+      const customer = await handleManualAddCustomerAPI(formData);
+      setCustomers(prev => [customer, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({ title: "Customer Added", description: `${customer.name} has been successfully added.` });
+      return { success: true, customer };
     } catch (error) {
       console.error("Failed to manually add customer:", error);
       toast({ title: "Error", description: "An unexpected error occurred while adding the customer.", variant: "destructive" });
@@ -121,7 +131,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateCustomer = async (customerId: string, updatedData: Partial<Customer>) => {
     try {
-      const updatedCustomer = await updateCustomerAction(customerId, updatedData);
+      const updatedCustomer = await updateCustomerAPI(customerId, updatedData);
       if (updatedCustomer) {
         setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
         toast({ title: "Customer Updated", description: `${updatedCustomer.name}'s details have been updated.` });
@@ -132,33 +142,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to update customer:", error);
       toast({ title: "Error", description: "Failed to update customer.", variant: "destructive" });
     }
-  };
-  
-  const assignCustomer = async (customerId: string, employeeId: string | null) => {
+  };  const assignCustomer = async (customerId: string, employeeId: string | null) => {
+    if (!employeeId) {
+      toast({ title: "Error", description: "Please select an employee to assign.", variant: "destructive" });
+      return;
+    }
+    
     try {
-      const updatedCustomer = await assignCustomerAction(customerId, employeeId);
-      if (updatedCustomer) {
-        setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-        const employee = users.find(u => u.id === employeeId);
-        toast({ title: "Customer Assigned", description: `${updatedCustomer.name} assigned to ${employee ? employee.name : 'Unassigned'}.` });
-      } else {
-        throw new Error("Customer not found or assignment failed");
-      }
+      const updatedCustomer = await assignCustomerAPI(customerId, employeeId);
+      setCustomers(prev => prev.map(c => c.id === customerId ? updatedCustomer : c));
+      const employee = users.find(u => u.id === employeeId);
+      toast({ title: "Customer Assigned", description: `${updatedCustomer.name} assigned to ${employee ? employee.name : 'Unassigned'}.` });
     } catch (error) {
       console.error("Failed to assign customer:", error);
       toast({ title: "Error", description: "Failed to assign customer.", variant: "destructive" });
     }
   };
-
   const updateCustomerStatus = async (customerId: string, status: CustomerStatus, notes?: string) => {
     try {
-      const updatedCustomer = await updateCustomerStatusAction(customerId, status, notes);
-      if (updatedCustomer) {
-        setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-        toast({ title: "Customer Status Updated", description: `${updatedCustomer.name} status set to ${status}.` });
-      } else {
-        throw new Error("Customer not found or status update failed");
-      }
+      const updatedCustomer = await updateCustomerStatusAPI(customerId, status, notes);
+      setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+      toast({ title: "Customer Status Updated", description: `${updatedCustomer.name} status set to ${status}.` });
     } catch (error) {
       console.error("Failed to update customer status:", error);
       toast({ title: "Error", description: "Failed to update customer status.", variant: "destructive" });
@@ -167,7 +171,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteAllCustomers = async () => {
     try {
-      const result = await deleteAllCustomersAction();
+      const result = await deleteAllCustomersAPI();
       if (result.success) {
         setCustomers([]); 
         toast({
@@ -189,7 +193,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addEmployee = async (employeeData: EmployeeCreationData) => {
     try {
-      const newEmployee = await addEmployeeAction(employeeData); 
+      const newEmployee = await addEmployeeAPI(employeeData); 
       setUsers(prev => [newEmployee, ...prev]);
       if (newEmployee.role === 'employee') {
         setEmployees(prev => [newEmployee, ...prev]);
@@ -203,7 +207,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateEmployee = async (employeeId: string, updatedData: EmployeeUpdateData) => {
     try {
-      const updatedEmployee = await updateEmployeeAction(employeeId, updatedData);
+      const updatedEmployee = await updateEmployeeAPI(employeeId, updatedData);
       if (updatedEmployee) {
         setUsers(prevUsers => prevUsers.map(user => user.id === updatedEmployee.id ? updatedEmployee : user));
         
@@ -229,11 +233,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteEmployee = async (employeeId: string) => {
     try {
-      const result = await deleteEmployeeAction(employeeId);
+      const result = await deleteEmployeeAPI(employeeId);
       if (result.success) {
         setUsers(prev => prev.filter(u => u.id !== employeeId));
         setEmployees(prev => prev.filter(e => e.id !== employeeId));
-        const fetchedCustomers = await getCustomers();
+        const fetchedCustomers = await getCustomersAPI();
         setCustomers(fetchedCustomers);
         toast({ title: "Employee Deleted", description: `Employee has been deleted.` });
       } else {
@@ -247,7 +251,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleEmployeeSuspension = async (employeeId: string) => {
     try {
-      const updatedEmployee = await toggleEmployeeSuspensionAction(employeeId);
+      const updatedEmployee = await toggleEmployeeSuspensionAPI(employeeId);
       if (updatedEmployee) {
         const newStatus = updatedEmployee.status === 'active' ? 'activated' : 'suspended';
         setUsers(prev => prev.map(u => u.id === updatedEmployee.id ? updatedEmployee : u));
@@ -261,9 +265,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Error", description: `Failed to toggle suspension: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
     }
   };
-  const createFollowUpReminderFunc = async (data: CreateFollowUpReminderData) => {
+  const createFollowUpReminderAPIFunc = async (data: CreateFollowUpReminderData) => {
     try {
-      const newReminder = await createFollowUpReminder(data);
+      const newReminder = await createFollowUpReminderAPI(data);
       setFollowUpReminders(prev => [...prev, newReminder]);
       toast({ title: "Reminder Created", description: "The follow-up reminder has been created." });
       refreshReminders();
@@ -274,7 +278,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
   const getCustomerReminders = async (customerId: string) => {
     try {
-      return await getFollowUpRemindersByCustomer(customerId);
+      return await getFollowUpRemindersByCustomerAPI(customerId);
     } catch (error) {
       console.error("Failed to fetch customer reminders:", error);
       toast({ title: "Error", description: "Failed to load reminders for this customer.", variant: "destructive" });
@@ -284,7 +288,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const updateReminderStatus = async (reminderId: string, status: FollowUpStatus) => {
     try {
-      await updateFollowUpReminderStatus(reminderId, status);
+      await updateFollowUpReminderStatusAPI(reminderId, status);
       setFollowUpReminders(prev => prev.map(r => r.id === reminderId ? { ...r, status } : r));
       toast({ title: "Reminder Status Updated", description: "The status of the reminder has been updated." });
     } catch (error) {
@@ -295,7 +299,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteReminder = async (reminderId: string) => {
     try {
-      await deleteFollowUpReminder(reminderId);
+      await deleteFollowUpReminderAPI(reminderId);
       setFollowUpReminders(prev => prev.filter(r => r.id !== reminderId));
       toast({ title: "Reminder Deleted", description: "The follow-up reminder has been deleted." });
     } catch (error) {
@@ -306,7 +310,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshReminders = async () => {
     try {
-      const reminders = await getDueFollowUpReminders();
+      const reminders = await getDueFollowUpRemindersAPI();
       setDueReminders(reminders);
     } catch (error) {
       console.error("Failed to fetch due reminders:", error);
@@ -331,7 +335,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       updateEmployee,
       deleteEmployee,
       toggleEmployeeSuspension,
-      createFollowUpReminder: createFollowUpReminderFunc,
+      createFollowUpReminderAPI: createFollowUpReminderAPIFunc,
       getCustomerReminders,
       updateReminderStatus,
       deleteReminder,

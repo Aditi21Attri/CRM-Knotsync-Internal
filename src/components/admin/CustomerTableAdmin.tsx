@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/contexts/DataContext";
 import type { Customer, User, CustomerStatus } from "@/lib/types";
-import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag, CalendarDays, Bell } from "lucide-react";
+import { ArrowUpDown, Search, Filter, UserCircle, Edit3, Tag, CalendarDays, Bell, Mail, Phone, MessageCircle, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,6 +25,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -33,6 +34,8 @@ import { FollowUpReminderDialog } from "@/components/shared/FollowUpReminderDial
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
+import { communicationUtils } from '@/lib/communication';
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<CustomerStatus, string> = {
   hot: "bg-green-500 hover:bg-green-600",
@@ -46,6 +49,7 @@ const STANDARD_CUSTOMER_FIELDS = ['id', '_id', 'name', 'email', 'phoneNumber', '
 
 export function CustomerTableAdmin() {
   const { customers, employees, assignCustomer, updateCustomerStatus, dataLoading } = useData();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all">("all");
   const [assignedFilter, setAssignedFilter] = useState<string | "all" | "unassigned">("all");
@@ -195,6 +199,17 @@ export function CustomerTableAdmin() {
     setEditingCustomer(customer);
     setIsEditModalOpen(true);
   };
+  const handleSendEmail = (customer: Customer) => {
+    communicationUtils.sendEmail(customer, toast);
+  };
+
+  const handleWhatsApp = (customer: Customer) => {
+    communicationUtils.sendWhatsApp(customer, toast);
+  };
+
+  const handleCall = (customer: Customer) => {
+    communicationUtils.makeCall(customer, toast);
+  };
 
   if (dataLoading) return <div className="flex justify-center items-center h-[calc(100vh-20rem)]"><LoadingSpinner message="Loading customers..." /></div>;
 
@@ -311,7 +326,7 @@ export function CustomerTableAdmin() {
               {allCustomFieldKeys.map(key => (
                   <TableHead key={key} className="whitespace-nowrap">{formatHeaderLabel(key)}</TableHead>
               ))}
-              <TableHead className="text-right w-[140px] sticky right-0 bg-background z-10">Actions</TableHead>
+              <TableHead className="text-right w-[200px] sticky right-0 bg-background z-10">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -389,6 +404,13 @@ export function CustomerTableAdmin() {
                     />
                     <Button variant="ghost" size="icon" onClick={() => handleEditCustomer(customer)} aria-label="Edit customer">
                         <Edit3 className="h-4 w-4" />
+                    </Button>                    <Button variant="ghost" size="icon" onClick={() => handleSendEmail(customer)} aria-label="Send email" className="hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/20">
+                        <Mail className="h-4 w-4" />
+                    </Button>                    <Button variant="ghost" size="icon" onClick={() => handleWhatsApp(customer)} aria-label="Send WhatsApp message" disabled={!customer.phoneNumber} className="hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/20">
+                        <MessageCircle className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleCall(customer)} aria-label="Call customer" disabled={!customer.phoneNumber} className="hover:bg-purple-100 hover:text-purple-600 dark:hover:bg-purple-900/20">
+                        <Phone className="h-4 w-4" />
                     </Button>
                   </div>
                 </TableCell>

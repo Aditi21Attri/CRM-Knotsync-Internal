@@ -18,9 +18,10 @@ import { useData } from "@/contexts/DataContext";
 import type { Customer } from "@/lib/types";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { FollowUpRemindersPanel } from "@/components/shared/FollowUpRemindersPanel";
-import { Loader2, CalendarClock, Bell } from "lucide-react";
+import { Loader2, CalendarClock, Bell, Mail, Phone, MessageCircle } from "lucide-react";
 import { useState, useMemo } from "react";
 import { format, parseISO } from 'date-fns';
+import { communicationUtils } from '@/lib/communication';
 
 const customerCoreEditFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -47,6 +48,18 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
   const customFieldKeys = useMemo(() => {
     return Object.keys(customer).filter(key => !STANDARD_FIELDS.includes(key));
   }, [customer]);
+
+  const handleSendEmail = () => {
+    communicationUtils.sendEmail(customer);
+  };
+
+  const handleWhatsApp = () => {
+    communicationUtils.sendWhatsApp(customer);
+  };
+
+  const handleCall = () => {
+    communicationUtils.makeCall(customer);
+  };
 
   const form = useForm<CustomerEditFormValues>({
     resolver: zodResolver(customerCoreEditFormSchema), 
@@ -168,7 +181,7 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
                 />
               ))}
             </div>
-          )}           <div className="pt-4 space-y-2 text-xs text-muted-foreground">
+          )}          <div className="pt-4 space-y-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
                 <CalendarClock className="h-3.5 w-3.5" />
                 <span>Created: {formatDate(customer.createdAt)}</span>
@@ -176,6 +189,39 @@ export function CustomerEditForm({ customer, onFormSubmit }: CustomerEditFormPro
             <div className="flex items-center gap-2">
                 <CalendarClock className="h-3.5 w-3.5" />
                 <span>Last Contacted: {formatDate(customer.lastContacted)}</span>
+            </div>
+            <div className="flex items-center gap-2 pt-2">              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSendEmail}
+                className="flex-1 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-900/20"
+              >
+                <Mail className="h-4 w-4 mr-1" />
+                Email
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleWhatsApp}
+                disabled={!customer.phoneNumber}
+                className="flex-1 hover:bg-green-50 hover:border-green-300 hover:text-green-700 dark:hover:bg-green-900/20"
+              >
+                <MessageCircle className="h-4 w-4 mr-1" />
+                WhatsApp
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCall}
+                disabled={!customer.phoneNumber}
+                className="flex-1 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 dark:hover:bg-purple-900/20"
+              >
+                <Phone className="h-4 w-4 mr-1" />
+                Call
+              </Button>
             </div>
           </div>
 

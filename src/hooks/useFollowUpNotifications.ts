@@ -4,8 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { getDueFollowUpReminders, markReminderNotificationSent } from '@/lib/actions/followUpActions';
-import { sendFollowUpReminderNotification } from '@/lib/notifications';
+import { getDueFollowUpRemindersAPI, markReminderNotificationSentAPIAPI } from '@/lib/api-client';
 import type { FollowUpReminder } from '@/lib/types';
 
 // Hook to check for due follow-up reminders
@@ -16,34 +15,49 @@ export function useFollowUpNotifications() {
 
   const checkForDueReminders = useCallback(async () => {
     try {
-      const dueReminders = await getDueFollowUpReminders();
+      console.log('🔍 Checking for due follow-up reminders...');
+      const dueReminders = await getDueFollowUpRemindersAPI();
+      
+      if (dueReminders.length > 0) {
+        console.log(`📋 Found ${dueReminders.length} due reminder(s)`);
+      }
       
       for (const reminder of dueReminders) {
         // Find the user who created this reminder
         const creator = employees.find(emp => emp.id === reminder.createdBy);
         if (creator) {
-          // Send notification
-          await sendFollowUpReminderNotification({
-            reminder,
-            userEmail: creator.email,
-            userName: creator.name,
+          console.log(`📤 Sending notification for reminder: ${reminder.title} to ${creator.name}`);
+            // Send notification via API
+          await fetch('/api/notifications/demo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'reminder',
+              data: {
+                reminder,
+                userEmail: creator.email,
+                userName: creator.name,
+              }
+            })
           });
 
           // Mark notification as sent
-          await markReminderNotificationSent(reminder.id);
+          await markReminderNotificationSentAPI(reminder.id);
 
           // Show in-app notification if this is for the current user
           if (currentUser && reminder.createdBy === currentUser.id) {
             toast({
-              title: "Follow-up Reminder",
+              title: "⏰ Follow-up Reminder",
               description: `Time to follow up with ${reminder.customerName}: ${reminder.title}`,
-              duration: 8000,
+              duration: 10000,
             });
           }
+        } else {
+          console.warn(`👤 Creator not found for reminder: ${reminder.id}`);
         }
       }
     } catch (error) {
-      console.error('Failed to check for due reminders:', error);
+      console.error('❌ Failed to check for due reminders:', error);
     }
   }, [employees, currentUser, toast]);
 
