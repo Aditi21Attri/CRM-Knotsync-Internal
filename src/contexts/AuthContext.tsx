@@ -5,7 +5,7 @@ import type { User } from '@/lib/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { authenticateUserAPIAPI, createInitialAdminAPI } from '@/lib/api-client';
+import { authenticateUserAPI, createInitialAdminAPI } from '@/lib/api-client';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -90,24 +90,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push('/login');
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
-
   const createInitialAdmin = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const result = await createInitialAdminAPI({ name, email, password });
-      if (result.success && result.user) {
-        toast({
-          title: "Admin Account Created",
-          description: `Admin ${result.user.name} created. Please log in.`,
-        });
-        // router.push('/login'); // Or automatically log them in
-      } else {
-        toast({
-          title: "Admin Creation Failed",
-          description: result.message || "Could not create admin account.",
-          variant: "destructive",
-        });
-      }
+      const user = await createInitialAdminAPI({ name, email, password });
+      toast({
+        title: "Admin Account Created",
+        description: `Admin ${user.name} created. Please log in.`,
+      });
+      // router.push('/login'); // Or automatically log them in
     } catch (error) {
       console.error("Create admin error:", error);
       toast({

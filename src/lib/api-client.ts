@@ -15,7 +15,20 @@ import type {
 // Customer API functions
 export async function getCustomersAPI(): Promise<Customer[]> {
   const response = await fetch('/api/customers');
-  const data = await response.json();
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${text}`);
+  }
+  
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    const text = await response.text();
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
+  
   if (!data.success) throw new Error(data.error || 'Failed to fetch customers');
   return data.customers;
 }
@@ -68,7 +81,20 @@ export async function deleteCustomerAPI(customerId: string): Promise<{ success: 
   const response = await fetch(`/api/customers/${customerId}`, {
     method: 'DELETE'
   });
-  const data = await response.json();
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${text}`);
+  }
+  
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    const text = await response.text();
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
+  
   if (!data.success) throw new Error(data.error || 'Failed to delete customer');
   return data;
 }
@@ -255,7 +281,20 @@ export async function deleteAllCustomersAPI(): Promise<{ success: boolean; delet
   const response = await fetch('/api/customers', {
     method: 'DELETE'
   });
-  const data = await response.json();
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${text}`);
+  }
+  
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    const text = await response.text();
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
+  
   if (!data.success) throw new Error(data.error || 'Failed to delete all customers');
   return data;
 }
