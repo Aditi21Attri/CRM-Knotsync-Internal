@@ -1,4 +1,4 @@
-# CRM Knotsync Internal
+# CRM Internal
 
 CRM Knotsync Internal is a robust, customizable CRM (Customer Relationship Management) solution built with Next.js, Tailwind CSS, Firebase, and MongoDB. Designed for modern sales and support teams, it provides seamless authentication, dashboard management, and data analytics in a scalable architecture.
 
